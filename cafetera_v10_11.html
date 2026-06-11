@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Cafetera BsAs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f0f0f0;
+  --white: #ffffff;
+  --ink: #111111;
+  --ink2: #555555;
+  --ink3: #999999;
+  --border: #e4e4e4;
+  --accent: #3b5bdb;
+  --green: #2f9e44;
+  --amber: #e67700;
+  --red: #c92a2a;
+  --purple: #7048e8;
+  --blue: #1971c2;
+  --teal: #0c8599;
+  --topbar: 108px;
+}
+
+html { height: 100%; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--ink); min-height: 100%; }
+
+/* ── TOPBAR ── */
+#topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: var(--white); border-bottom: 1px solid var(--border); padding: 0 16px; }
+.tb1 { display: flex; align-items: center; gap: 10px; height: 54px; }
+.hamburger { width: 36px; height: 36px; display: flex; flex-direction: column; justify-content: center; gap: 5px; cursor: pointer; flex-shrink: 0; }
+.hamburger span { display: block; height: 2px; background: var(--ink); border-radius: 2px; }
+.hamburger span:first-child { width: 22px; }
+.hamburger span:nth-child(2) { width: 16px; }
+.hamburger span:last-child { width: 22px; }
+.sw { flex: 1; position: relative; }
+.si { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--ink3); font-size: 13px; pointer-events: none; }
+.sinput { width: 100%; padding: 9px 12px 9px 34px; background: var(--bg); border: 1.5px solid transparent; border-radius: 100px; font-family: 'Inter', sans-serif; font-size: .88rem; color: var(--ink); outline: none; }
+.sinput:focus { background: #fff; border-color: var(--accent); }
+.sinput::placeholder { color: var(--ink3); }
+.mapbtn { width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0; background: var(--bg); border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; transition: all .15s; }
+.mapbtn.on, .mapbtn:hover { background: #eef1ff; border-color: var(--accent); }
+.chips { display: flex; gap: 7px; padding: 8px 0 10px; overflow-x: auto; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { display: flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 100px; white-space: nowrap; flex-shrink: 0; border: 1.5px solid var(--border); background: var(--white); color: var(--ink2); font-size: .79rem; font-weight: 500; cursor: pointer; transition: all .15s; }
+.chip:hover { border-color: #bbb; color: var(--ink); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ── LIST VIEW ── */
+#listView { padding-top: var(--topbar); padding-bottom: 40px; display: flex; flex-direction: column; gap: 0; }
+#listView.hidden { display: none; }
+.rlbl { font-size: .7rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink3); padding: 12px 16px 10px; }
+
+/* ── MAP VIEW ── */
+#mapView { display: none; position: fixed; top: var(--topbar); left: 0; right: 0; bottom: 0; z-index: 1; }
+#mapView.visible { display: block; }
+#map { width: 100%; height: 100%; }
+
+/* ── CARD ── */
+.card { width: 100%; cursor: pointer; background: var(--white); margin-bottom: 10px; }
+.card:last-child { margin-bottom: 0; }
+.card-photo { position: relative; width: 100%; height: 280px; overflow: hidden; display: block; background: #ccc; }
+.card-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .4s ease; }
+.card:hover .card-photo img { transform: scale(1.04); }
+.card-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.80) 0%, rgba(0,0,0,.15) 40%, transparent 65%); pointer-events: none; }
+.card-text { position: absolute; bottom: 0; left: 0; right: 0; z-index: 2; padding: 20px 18px 16px; }
+.card-name { font-size: 1.2rem; font-weight: 700; color: #fff; line-height: 1.25; margin-bottom: 6px; text-shadow: 0 1px 8px rgba(0,0,0,.5); }
+.card-loc { font-size: .83rem; color: rgba(255,255,255,.9); display: flex; align-items: center; gap: 5px; }
+.card-badge { position: absolute; top: 12px; right: 12px; z-index: 3; background: rgba(255,255,255,.96); backdrop-filter: blur(6px); border-radius: 100px; padding: 5px 11px 5px 9px; display: flex; align-items: center; gap: 5px; font-size: .78rem; font-weight: 700; color: var(--ink); box-shadow: 0 1px 8px rgba(0,0,0,.18); }
+.dot { width: 7px; height: 7px; border-radius: 50%; }
+.dg { background: #2f9e44; } .da { background: #e67700; } .dr { background: #c92a2a; } .dn { background: #ccc; }
+.card-strip { background: var(--white); padding: 10px 16px 11px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); }
+.tag { font-size: .71rem; font-weight: 500; padding: 3px 9px; border-radius: 100px; background: var(--bg); color: var(--ink2); border: 1px solid var(--border); display: flex; align-items: center; gap: 3px; }
+.tag.g { background: #ebfbee; color: var(--green); border-color: #b2f2bb; }
+.tag.a { background: #fff8e1; color: var(--amber); border-color: #ffe082; }
+.tag.r { background: #fff0f0; color: var(--red); border-color: #ffa8a8; }
+.tag.dim { color: var(--ink3); border-style: dashed; }
+/* work levels */
+.tag.cowork   { background: #f3f0ff; color: var(--purple); border-color: #c5b8fb; }
+.tag.laptop   { background: #e7f5ff; color: var(--blue);   border-color: #a5d8ff; }
+.tag.casual   { background: #e6fcf5; color: var(--teal);   border-color: #99e9d0; }
+/* open/closed badge on card */
+.open-badge { position: absolute; top: 12px; left: 12px; z-index: 3; font-size: .65rem; font-weight: 700; padding: 3px 9px; border-radius: 100px; backdrop-filter: blur(6px); }
+.open-badge.open   { background: rgba(47,158,68,.92);  color: #fff; }
+.open-badge.closed { background: rgba(0,0,0,.55);      color: #fff; }
+.open-badge.unk    { background: rgba(120,120,120,.7); color: #fff; }
+.empty { padding: 56px 16px; text-align: center; color: var(--ink3); font-size: .9rem; }
+
+/* ── MAP MARKERS ── */
+.leaflet-control-attribution { display: none; }
+.leaflet-control-zoom a { background: #fff!important; color: #111!important; border: 1px solid var(--border)!important; width: 34px!important; height: 34px!important; line-height: 32px!important; font-size: 15px!important; box-shadow: 0 1px 6px rgba(0,0,0,.1)!important; }
+.pin { width: 34px; height: 34px; border-radius: 50%; background: #fff; border: 2.5px solid var(--accent); display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.15); transition: transform .15s; }
+.pin:hover, .pin.sel { transform: scale(1.25); background: var(--accent); }
+.pin.nd { border-color: #ccc; }
+.udot { width: 16px; height: 16px; background: #4a9eff; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 4px rgba(74,158,255,.25); }
+.upulse { position: absolute; width: 36px; height: 36px; border-radius: 50%; background: rgba(74,158,255,.18); top: 50%; left: 50%; transform: translate(-50%,-50%); animation: pu 2s ease-out infinite; }
+@keyframes pu { 0% { transform: translate(-50%,-50%) scale(.4); opacity: 1; } 100% { transform: translate(-50%,-50%) scale(2.2); opacity: 0; } }
+
+/* popup */
+.leaflet-popup-content-wrapper { background: #fff; border-radius: 14px!important; box-shadow: 0 8px 32px rgba(0,0,0,.14)!important; border: 1px solid var(--border); padding: 0!important; overflow: hidden; }
+.leaflet-popup-tip-container { display: none; }
+.leaflet-popup-content { margin: 0!important; width: 240px!important; }
+.pu-img { height: 120px; overflow: hidden; position: relative; background: #ddd; }
+.pu-img img { width: 100%; height: 100%; object-fit: cover; }
+.pu-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.65) 0%, transparent 55%); }
+.pu-txt { position: absolute; bottom: 0; left: 0; right: 0; z-index: 1; padding: 10px 12px 9px; }
+.pu-name { font-size: .9rem; font-weight: 700; color: #fff; line-height: 1.2; }
+.pu-barrio { font-size: .7rem; color: rgba(255,255,255,.8); margin-top: 2px; }
+.pu-name-body { font-size: .88rem; font-weight: 700; color: var(--ink); line-height: 1.2; margin-bottom: 2px; }
+.pu-barrio-body { font-size: .68rem; color: var(--ink3); margin-bottom: 4px; }
+.pu-body { padding: 10px 12px 12px; }
+.pu-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.pu-score { font-size: .82rem; font-weight: 700; display: flex; align-items: center; gap: 5px; }
+.pu-dist { font-size: .72rem; color: var(--ink3); }
+.pu-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+.pu-tag { font-size: .65rem; padding: 2px 7px; border-radius: 100px; background: var(--bg); color: var(--ink2); border: 1px solid var(--border); }
+.pu-tag.g { background: #ebfbee; color: var(--green); border-color: #b2f2bb; }
+.pu-btn { width: 100%; padding: 8px; border: none; border-radius: 100px; background: var(--accent); color: #fff; font-family: 'Inter', sans-serif; font-size: .78rem; font-weight: 600; cursor: pointer; }
+
+/* locate btn */
+#locBtn { position: fixed; right: 14px; bottom: 20px; z-index: 600; width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 19px; cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,.12); }
+#locBtn.hide { display: none; }
+
+/* ── DETAIL PANEL ── */
+#bd { position: fixed; inset: 0; z-index: 1999; background: rgba(0,0,0,.32); opacity: 0; pointer-events: none; transition: opacity .3s; }
+#bd.on { opacity: 1; pointer-events: all; }
+#panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 2000; width: min(440px, 100vw); background: #fff; transform: translateX(100%); transition: transform .3s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; box-shadow: -6px 0 40px rgba(0,0,0,.14); }
+#panel.on { transform: translateX(0); }
+.p-img { height: 250px; flex-shrink: 0; position: relative; overflow: hidden; background: #ddd; }
+.p-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.p-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.72) 0%, transparent 52%); }
+.p-txt { position: absolute; bottom: 0; left: 0; right: 0; z-index: 1; padding: 20px 20px 16px; }
+.p-name { font-size: 1.3rem; font-weight: 700; color: #fff; line-height: 1.2; }
+.p-barrio { font-size: .8rem; color: rgba(255,255,255,.75); margin-top: 4px; }
+.p-close { position: absolute; top: 12px; right: 12px; z-index: 2; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.92); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #111; }
+.p-body { overflow-y: auto; flex: 1; padding: 18px 20px 44px; scrollbar-width: none; }
+.p-body::-webkit-scrollbar { display: none; }
+.p-sbox { background: var(--bg); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.pv { font-size: 2.1rem; font-weight: 700; line-height: 1; }
+.pv.g { color: var(--green); } .pv.a { color: var(--amber); } .pv.r { color: var(--red); } .pv.n { color: var(--ink3); }
+.pl { font-size: .62rem; text-transform: uppercase; letter-spacing: .1em; color: var(--ink3); margin-bottom: 2px; }
+.pg { font-size: 1.1rem; font-weight: 600; text-align: right; }
+.pgs { font-size: .68rem; color: var(--ink3); text-align: right; }
+.psec { font-size: .63rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--ink3); margin-bottom: 9px; padding-bottom: 7px; border-bottom: 1px solid var(--border); margin-top: 16px; }
+.p-attrs { display: grid; grid-template-columns: repeat(5,1fr); gap: 7px; margin-bottom: 4px; }
+.pa { background: var(--bg); border-radius: 10px; padding: 9px 4px 7px; text-align: center; }
+.pa-ic { font-size: 1rem; margin-bottom: 3px; }
+.pa-lb { font-size: .54rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink3); margin-bottom: 5px; }
+.pa-bar { height: 3px; background: var(--border); border-radius: 100px; margin: 0 4px 3px; overflow: hidden; }
+.pa-fill { height: 100%; background: var(--accent); border-radius: 100px; }
+.pa-vl { font-size: .78rem; font-weight: 600; }
+.p-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.pp { display: flex; align-items: center; gap: 4px; font-size: .75rem; padding: 5px 11px; border-radius: 100px; background: var(--bg); border: 1px solid var(--border); color: var(--ink2); }
+.pp.g { background: #ebfbee; color: var(--green); border-color: #b2f2bb; }
+.pp.a { background: #fff8e1; color: var(--amber); border-color: #ffe082; }
+.pp.r { background: #fff0f0; color: var(--red); border-color: #ffa8a8; }
+.pp.cowork { background: #f3f0ff; color: var(--purple); border-color: #c5b8fb; }
+.pp.laptop { background: #e7f5ff; color: var(--blue);   border-color: #a5d8ff; }
+.pp.casual { background: #e6fcf5; color: var(--teal);   border-color: #99e9d0; }
+.pp.open-now { background: #ebfbee; color: var(--green); border-color: #b2f2bb; font-weight: 600; }
+.pp.closed-now { background: #fff0f0; color: var(--red); border-color: #ffa8a8; font-weight: 600; }
+.p-addr { font-size: .83rem; color: var(--ink2); line-height: 1.55; margin-bottom: 6px; }
+.p-ig { font-size: .83rem; color: var(--accent); font-weight: 500; margin-bottom: 6px; cursor: pointer; }
+.p-directions-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin:12px 0 4px;padding:12px;border-radius:12px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;text-decoration:none;}
+.p-horario { font-size: .8rem; color: var(--ink2); line-height: 1.5; margin-bottom: 14px; }
+.stars { display: flex; gap: 5px; margin-bottom: 9px; }
+.star { font-size: 1.8rem; cursor: pointer; color: var(--border); line-height: 1; transition: all .12s; }
+.star:hover, .star.on { color: #e67700; transform: scale(1.1); }
+.rta { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: 'Inter', sans-serif; font-size: .84rem; color: var(--ink); resize: none; outline: none; background: var(--bg); margin-bottom: 10px; }
+.rta:focus { border-color: var(--accent); background: #fff; }
+
+/* ── FAVORITOS ── */
+.fav-btn {
+  position:absolute;top:12px;left:12px;z-index:3;
+  width:34px;height:34px;border-radius:50%;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(6px);
+  border:none;cursor:pointer;font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 8px rgba(0,0,0,.15);transition:transform .15s;
+}
+.fav-btn:hover { transform:scale(1.15); }
+.fav-btn.on { background:#fff0f5; }
+.pu-fav-btn {
+  width:38px;height:38px;border-radius:100px;border:1.5px solid var(--border);
+  background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;transition:all .15s;
+}
+.pu-fav-btn:hover { border-color:#f06595;background:#fff0f5; }
+.pu-fav-btn.on { border-color:#f06595;background:#fff0f5; }
+.p-fav-btn {
+  display:flex;align-items:center;gap:6px;
+  padding:10px 14px;border:1.5px solid var(--border);
+  border-radius:100px;background:#fff;cursor:pointer;
+  font-size:.82rem;font-weight:600;color:var(--ink2);
+  transition:all .15s;width:100%;justify-content:center;margin-bottom:14px;
+}
+.p-fav-btn:hover { border-color:#f06595;color:#e64980; }
+.p-fav-btn.on { background:#fff0f5;border-color:#f06595;color:#e64980; }
+
+.sbtn { width: 100%; padding: 13px; border: none; border-radius: 100px; background: var(--accent); color: #fff; font-family: 'Inter', sans-serif; font-size: .9rem; font-weight: 600; cursor: pointer; }
+
+/* ── SIDE MENU ── */
+#menuOverlay { position:fixed;inset:0;z-index:2999;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .25s; }
+#menuOverlay.on { opacity:1;pointer-events:all; }
+#sideMenu {
+  position:fixed;top:0;left:0;bottom:0;z-index:3000;
+  width:min(320px,85vw);background:#fff;
+  transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+  box-shadow:6px 0 40px rgba(0,0,0,.13);
+}
+#sideMenu.on { transform:translateX(0); }
+.menu-header {
+  background:var(--accent);padding:48px 24px 24px;
+  display:flex;flex-direction:column;gap:4px;flex-shrink:0;
+}
+.menu-logo { font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:-.02em; }
+.menu-sub  { font-size:.78rem;color:rgba(255,255,255,.75); }
+.menu-user-box {
+  margin-top:16px;background:rgba(255,255,255,.15);border-radius:12px;
+  padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;
+  transition:background .15s;
+}
+.menu-user-box:hover { background:rgba(255,255,255,.25); }
+.menu-avatar { width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;overflow:hidden; }
+.menu-avatar img { width:100%;height:100%;object-fit:cover; }
+.menu-user-name { font-size:.85rem;font-weight:600;color:#fff;line-height:1.2; }
+.menu-user-sub  { font-size:.7rem;color:rgba(255,255,255,.7); }
+.menu-body { flex:1;overflow-y:auto;padding:12px 0; }
+.menu-item {
+  display:flex;align-items:center;gap:14px;padding:14px 24px;
+  cursor:pointer;transition:background .12s;color:var(--ink);font-size:.9rem;font-weight:500;
+}
+.menu-item:hover { background:var(--bg); }
+.menu-item-ic { font-size:1.2rem;width:24px;text-align:center;flex-shrink:0; }
+.menu-item-lbl { flex:1; }
+.menu-item-sub { font-size:.7rem;color:var(--ink3);font-weight:400;margin-top:1px; }
+.menu-divider { height:1px;background:var(--border);margin:8px 24px; }
+.menu-footer { padding:16px 24px;font-size:.7rem;color:var(--ink3); }
+
+/* ── MODALES GENERICOS ── */
+.modal-overlay { position:fixed;inset:0;z-index:3500;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s; }
+.modal-overlay.on { opacity:1;pointer-events:all; }
+.modal-box { background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:0 0 32px;max-height:90vh;overflow-y:auto;transform:translateY(20px);transition:transform .25s; }
+.modal-overlay.on .modal-box { transform:translateY(0); }
+.modal-drag { width:40px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0; }
+.modal-title { font-size:1.1rem;font-weight:700;padding:20px 24px 4px; }
+.modal-body  { padding:0 24px; }
+.modal-close { position:absolute;top:16px;right:16px;width:30px;height:30px;border-radius:50%;background:var(--bg);border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center; }
+
+/* Suggest form */
+.sform-group { margin-bottom:14px; }
+.sform-label { font-size:.75rem;font-weight:600;color:var(--ink2);margin-bottom:5px;display:block; }
+.sform-input { width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:'Inter',sans-serif;font-size:.85rem;color:var(--ink);outline:none;background:var(--bg); }
+.sform-input:focus { border-color:var(--accent);background:#fff; }
+
+/* About */
+.about-hero { width:100%;height:120px;background:linear-gradient(135deg,#3b5bdb 0%,#7048e8 100%);display:flex;align-items:center;justify-content:center;font-size:3rem;border-radius:0; }
+.about-section { margin-bottom:20px; }
+.about-section h3 { font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:8px; }
+.about-section p { font-size:.87rem;color:var(--ink2);line-height:1.65; }
+.about-pill { display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:100px;padding:5px 12px;font-size:.78rem;font-weight:500;color:var(--ink2);margin:3px; }
+
+/* Login */
+.login-hero { text-align:center;padding:32px 24px 16px; }
+.login-emoji { font-size:3rem;display:block;margin-bottom:12px; }
+.login-title { font-size:1.2rem;font-weight:700;margin-bottom:6px; }
+.login-sub { font-size:.83rem;color:var(--ink2);line-height:1.5; }
+.login-benefits { background:var(--bg);border-radius:12px;padding:14px 16px;margin:16px 0; }
+.login-benefit { display:flex;align-items:center;gap:10px;font-size:.83rem;color:var(--ink2);padding:5px 0; }
+.google-btn {
+  width:100%;padding:13px;border:1.5px solid var(--border);border-radius:100px;
+  background:#fff;font-family:'Inter',sans-serif;font-size:.9rem;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:all .15s;color:var(--ink);
+}
+.google-btn:hover { border-color:#bbb;background:var(--bg); }
+.google-btn svg { flex-shrink:0; }
+.login-divider { display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--ink3);font-size:.75rem; }
+.login-divider::before,.login-divider::after { content:'';flex:1;height:1px;background:var(--border); }
+.email-btn { width:100%;padding:13px;border:none;border-radius:100px;background:var(--accent);color:#fff;font-family:'Inter',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer; }
+
+/* Share */
+.share-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0; }
+.share-opt { display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 8px;background:var(--bg);border-radius:14px;cursor:pointer;transition:background .12s;border:1.5px solid transparent; }
+.share-opt:hover { background:#eef1ff;border-color:var(--accent); }
+.share-opt-ic { font-size:1.6rem; }
+.share-opt-lbl { font-size:.7rem;font-weight:600;color:var(--ink2); }
+.share-link-box { display:flex;gap:8px;align-items:center;background:var(--bg);border-radius:10px;padding:10px 14px;font-size:.78rem;color:var(--ink2);border:1.5px solid var(--border); }
+.share-link-url { flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.share-copy-btn { flex-shrink:0;padding:5px 12px;border:none;border-radius:100px;background:var(--accent);color:#fff;font-size:.72rem;font-weight:600;cursor:pointer; }
+.copied-toast { position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:8px 18px;border-radius:100px;font-size:.8rem;font-weight:500;z-index:9999;opacity:0;transition:opacity .2s;pointer-events:none; }
+.copied-toast.on { opacity:1; }
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <div class="tb1">
+    <div class="hamburger" onclick="openMenu()"><span></span><span></span><span></span></div>
+    <div class="sw">
+      <span class="si">🔍</span>
+      <input class="sinput" id="srch" placeholder="Buscar café o barrio…" oninput="render()">
+    </div>
+    <div class="mapbtn" id="mapBtn" onclick="switchView()">🗺</div>
+  </div>
+  <div class="chips">
+    <div class="chip" id="clearBtn" onclick="clearFilts()" style="display:none">✕ Limpiar</div>
+    <div class="chip" data-f="favs" onclick="fc(this,'favs')">❤️ Guardados</div>
+    <div class="chip" data-f="open"      onclick="fc(this,'open')">🟢 Abierto ahora</div>
+    <div class="chip" data-f="work"      onclick="fc(this,'work')">💻 Work</div>
+    <div class="chip" data-f="pet"       onclick="fc(this,'pet')">🐾 Pet</div>
+    <div class="chip" data-f="brunch"    onclick="fc(this,'brunch')">🥐 Brunch</div>
+    <div class="chip" data-f="afuera"    onclick="fc(this,'afuera')">🌳 Outdoor seating</div>
+    <div class="chip" data-f="sol"       onclick="fc(this,'sol')">☀️ Sol</div>
+    <div class="chip" data-f="score4"    onclick="fc(this,'score4')">⭐ Rating 4.5+</div>
+  </div>
+</header>
+
+<div id="listView">
+  <div class="rlbl" id="rlbl"></div>
+</div>
+
+<div id="mapView"><div id="map"></div></div>
+<button id="locBtn" class="hide" onclick="locate()">📍</button>
+<div id="bd" onclick="closeP()"></div>
+<div id="panel">
+  <div class="p-img">
+    <img id="pImgEl" src="" alt="">
+    <button class="p-close" onclick="closeP()">✕</button>
+    <div class="p-txt">
+      <div class="p-name" id="pName"></div>
+      <div class="p-barrio" id="pBarrio"></div>
+    </div>
+  </div>
+  <div class="p-body" id="pBody"></div>
+</div>
+
+<script>
+const PHOTOS = [
+  'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=900&q=80',
+  'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=900&q=80',
+  'https://images.unsplash.com/photo-1445116572660-236099ec97a0?w=900&q=80',
+  'https://images.unsplash.com/photo-1559925393-8be0ec4767c8?w=900&q=80',
+  'https://images.unsplash.com/photo-1600093463592-8e36ae95ef56?w=900&q=80',
+  'https://images.unsplash.com/photo-1521017432531-fbd92d768814?w=900&q=80',
+  'https://images.unsplash.com/photo-1493857671505-72967e2e2760?w=900&q=80',
+  'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=900&q=80',
+  'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=900&q=80',
+  'https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=900&q=80',
+  'https://images.unsplash.com/photo-1453614512568-c4024d13c247?w=900&q=80',
+  'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=900&q=80',
+  'https://images.unsplash.com/photo-1506619216599-9d16d0903dfd?w=900&q=80',
+  'https://images.unsplash.com/photo-1485808191679-5f86510bd9d4?w=900&q=80',
+  'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=900&q=80',
+  'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=900&q=80',
+  'https://images.unsplash.com/photo-1456324463128-7ff6903988d8?w=900&q=80',
+  'https://images.unsplash.com/photo-1507914372368-b2b085b925a1?w=900&q=80',
+  'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=900&q=80',
+  'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=900&q=80',
+  'https://images.unsplash.com/photo-1513267048331-5611cad62e41?w=900&q=80',
+  'https://images.unsplash.com/photo-1498804103079-a6351b050096?w=900&q=80',
+  'https://images.unsplash.com/photo-1464979681340-bdd28a61699e?w=900&q=80',
+  'https://images.unsplash.com/photo-1516742419655-e7b5e4a43024?w=900&q=80',
+  'https://images.unsplash.com/photo-1534040385115-33dcb3acba5b?w=900&q=80',
+  'https://images.unsplash.com/photo-1447933601403-0c6688de566e?w=900&q=80',
+  'https://images.unsplash.com/photo-1462743001006-3ad0b8b4a4b9?w=900&q=80',
+  'https://images.unsplash.com/photo-1525193612562-0ec53b0e5d7c?w=900&q=80',
+  'https://images.unsplash.com/photo-1504630083234-14187a9df0f5?w=900&q=80',
+  'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=900&q=80',
+  'https://images.unsplash.com/photo-1481833761820-0509d3217039?w=900&q=80',
+  'https://images.unsplash.com/photo-1532004491497-ba35c367d634?w=900&q=80',
+  'https://images.unsplash.com/photo-1522992319-0365e5f11656?w=900&q=80',
+  'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=900&q=80',
+  'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=900&q=80',
+  'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=900&q=80',
+  'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80',
+  'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=900&q=80',
+  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=900&q=80',
+  'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=900&q=80',
+  'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=900&q=80',
+  'https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=900&q=80',
+  'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=900&q=80',
+];
+
+// ── CSV → CAFES ──────────────────────────────────────────
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQsMjKi-5r7L81xKdQFjIefHS_L-2VDFfGakQoB9wUw8vxb4ngA7aIagjMq6v2SapYfKXwXH9gWzrtb/pub?gid=945066339&single=true&output=csv';
+
+// Coordenadas por barrio para cafés sin lat/lon en el sheet
+const BARRIO_COORDS = {
+  'Palermo':      [-34.588, -58.432], 'Belgrano':     [-34.560, -58.452],
+  'Belgrano R':   [-34.565, -58.466], 'Colegiales':   [-34.574, -58.454],
+  'Chacarita':    [-34.586, -58.447], 'Saavedra':     [-34.551, -58.479],
+  'Nuñez':        [-34.548, -58.463], 'Recoleta':     [-34.591, -58.393],
+  'Caballito':    [-34.619, -58.441], 'Almagro':      [-34.604, -58.425],
+  'Villa Crespo': [-34.597, -58.440], 'Cañitas':      [-34.566, -58.439],
+  'Microcentro':  [-34.604, -58.381], 'San Telmo':    [-34.619, -58.372],
+  'Flores':       [-34.617, -58.465], 'Villa Devoto': [-34.590, -58.513],
+  'Olivos':       [-34.509, -58.480], 'San Isidro':   [-34.472, -58.527],
+  'Acassuso':     [-34.481, -58.499], 'Chapadmalal':  [-38.100, -57.650],
+};
+
+function parseNum(s){ return s ? parseFloat(String(s).replace(',','.')) : null; }
+
+function mapWork(w){
+  if(!w) return 'Chequear';
+  const v = w.trim().toLowerCase();
+  if(v.includes('cowork'))  return 'cowork';
+  if(v.includes('laptop'))  return 'laptop';
+  if(v.includes('casual'))  return 'casual';
+  if(v.includes('no work') || v==='no') return 'No';
+  return 'Chequear';
+}
+
+function mapYesNo(v){
+  if(!v) return 'Chequear';
+  const s = v.trim().toLowerCase();
+  if(s==='si' || s==='sí') return 'Si';
+  if(s==='no')             return 'No';
+  return 'Chequear';
+}
+
+// Parser simple de horario de texto → schedule [{d,f,t}]
+// Entiende patrones como "Lun a Dom 8 - 20", "Lun a Vier 8:30 - 20 // Sab y Dom 9 - 21"
+function parseSchedule(txt){
+  if(!txt || txt.trim()==='') return [];
+  const DAY = {lun:1,mar:2,mier:3,mié:3,mie:3,jue:4,vier:5,vie:5,sab:6,sáb:6,dom:0};
+  function dayRange(a,b){
+    const order=[1,2,3,4,5,6,0];
+    const ia=order.indexOf(a), ib=order.indexOf(b);
+    if(ia<0||ib<0) return [a];
+    if(ia<=ib) return order.slice(ia,ib+1);
+    return [...order.slice(ia),...order.slice(0,ib+1)];
+  }
+  function parseDays(part){
+    part = part.trim().toLowerCase();
+    const days=[];
+    // "lun, mier, jue y vier" o "sab y dom" o "lun a vier"
+    const tokens = part.split(/\s*(?:,|y)\s*/);
+    tokens.forEach(tok=>{
+      tok = tok.trim();
+      const rng = tok.match(/^(\w+)\s+a\s+(\w+)$/);
+      if(rng){
+        const a=DAY[rng[1].slice(0,4)], b=DAY[rng[2].slice(0,4)];
+        if(a!==undefined&&b!==undefined) days.push(...dayRange(a,b));
+      } else {
+        // single day — try first 4 chars
+        for(const k of Object.keys(DAY)){
+          if(tok.startsWith(k)){ days.push(DAY[k]); break; }
+        }
+      }
+    });
+    return [...new Set(days)];
+  }
+  function parseTime(t){
+    t=t.trim().replace(/\s*(am|pm)/i,'').trim();
+    const [h,m]=(t+':0').split(':').map(Number);
+    return h*60+(m||0);
+  }
+  const slots=[];
+  const parts = txt.split(/\s*\/\/\s*/);
+  parts.forEach(p=>{
+    p=p.trim();
+    // Espera: "Lun a Dom 8 - 20" o "Lun a Vier 8:30 - 20"
+    const m = p.match(/^([^0-9]+?)\s+(\d[\d:]*)\s*[-–a]\s*(\d[\d:]*)(.*)$/i);
+    if(!m) return;
+    const days=parseDays(m[1]);
+    let f=parseTime(m[2]), t=parseTime(m[3]);
+    // Handle "11:59 pm" style
+    if(m[4]&&m[4].toLowerCase().includes('pm')&&t<720) t+=720;
+    if(t===0) t=1439; // medianoche
+    if(days.length) slots.push({d:days,f,t});
+  });
+  return slots;
+}
+
+function csvToRow(line){
+  // CSV parser que respeta comillas
+  const cells=[];
+  let cur='', inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ inQ=!inQ; }
+    else if(c===','&&!inQ){ cells.push(cur); cur=''; }
+    else cur+=c;
+  }
+  cells.push(cur);
+  return cells.map(s=>s.trim());
+}
+
+function csvToCafes(csv){
+  const lines = csv.split('\n').filter(l=>l.trim());
+  // Saltear las primeras 2 filas (encabezados de sección y columnas)
+  const dataLines = lines.slice(2);
+  return dataLines.map((line, idx)=>{
+    const c = csvToRow(line);
+    // Columnas: 0=Café, 1=Barrio, 2=Dirección, 3=Lat, 4=Lon, 5=Rating, 6=Reviews,
+    //           7=Work, 8=Pet, 9=Brunch, 10=Instagram, 11=Horarios, 12=Outdoor, 13=Sol
+    const name    = c[0]||'';
+    if(!name) return null;
+    const barrio  = c[1]||'';
+    let lat = parseNum(c[3]);
+    let lon = parseNum(c[4]);
+    if(!lat||!lon){
+      const fb = BARRIO_COORDS[barrio] || [-34.588, -58.432];
+      // Pequeño offset aleatorio para que no se superpongan todos en el mismo punto
+      lat = fb[0] + (Math.random()-0.5)*0.008;
+      lon = fb[1] + (Math.random()-0.5)*0.008;
+    }
+    const horario_txt = c[11]||'';
+    return {
+      id:       idx,
+      name,
+      barrio,
+      dir:      c[2]||'',
+      lat, lon,
+      grating:  parseNum(c[5]),
+      reviews:  parseNum(c[6]) ? Math.round(parseNum(c[6])) : null,
+      work:     mapWork(c[7]),
+      pet:      mapYesNo(c[8]),
+      brunch:   mapYesNo(c[9]),
+      afuera:   mapYesNo(c[12]),
+      sol:      mapYesNo(c[13]),
+      llevar:   'Si',
+      instagram: c[10]||'',
+      horario_txt,
+      schedule: parseSchedule(horario_txt),
+    };
+  }).filter(Boolean);
+}
+
+let CAFES = []; // se llena al cargar
+
+// work: 'cowork'=morado | 'laptop'=azul | 'casual'=verde agua | 'No' | 'Chequear'
+// (legacy array — ya no se usa, se reemplazó por fetch)
+const _CAFES_LEGACY = [
+  {id:0,  name:'Cerezo Bar',                  barrio:'Belgrano R',  dir:'Cap. Gral. Ramón Freire 2277',      lat:-34.565,lon:-58.466,grating:4.3,reviews:94,   work:'casual', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@cerezo_bar',            horario_txt:'Lun a Vier 9:00 am - 7:30 pm // Sab a Dom 11:00 am - 7:00 pm',       schedule:[{d:[1,2,3,4,5],f:540,t:1170},{d:[0,6],f:660,t:1140}]},
+  {id:1,  name:'SĀNTAL - Espacio Pirámide',   barrio:'Belgrano',    dir:"O'Higgins 1502",                    lat:-34.565,lon:-58.448,grating:4.7,reviews:3505, work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@santalcafe',             horario_txt:'Lun a Dom 7:30 am - 8:30 pm',                    schedule:[{d:[0,1,2,3,4,5,6],f:450,t:1230}]},
+  {id:2,  name:'Beldo Saavedra',              barrio:'Saavedra',    dir:'Conde 4301',                        lat:-34.548,lon:-58.481,grating:4.9,reviews:255,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@beldosaavedra',          horario_txt:'Mar a Dom 9:00 am - 8:00 pm',                               schedule:[{d:[2,3,4,5,6,0],f:540,t:1200}]},
+  {id:3,  name:'Barragán Lonchería y Café',   barrio:'Palermo',     dir:'José A. Cabrera 3697',              lat:-34.596,lon:-58.418,grating:4.7,reviews:3732, work:'casual', pet:'Si',       brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@barragan.cafe',   horario_txt:'Lun a Sab 8:30 am - 8:00 pm // Dom 9:30 am - 7:30 pm',         schedule:[{d:[1,2,3,4,5,6],f:510,t:1200},{d:[0],f:570,t:1170}]},
+  {id:4,  name:'Cosecha Saavedra',            barrio:'Saavedra',    dir:'Pinto 3899',                        lat:-34.550,lon:-58.477,grating:3.9,reviews:825,  work:'casual', pet:'Chequear',brunch:'Chequear',afuera:'Si',sol:'Si',llevar:'Si', instagram:'@cosechaok',              horario_txt:'Lun a Dom 9:00 am - 9:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:540,t:1260}]},
+  {id:5,  name:'KISSATEN TOSTADOR',           barrio:'Belgrano',    dir:'Av. Juramento 1381',                lat:-34.556,lon:-58.446,grating:4.8,reviews:790,  work:'cowork', pet:'Chequear',brunch:'No', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@kissaten.tostador',      horario_txt:'Lun a Vier 8:00 am - 8:00 pm // Sab a Dom 8:30 am - 8:00 pm',        schedule:[{d:[1,2,3,4,5],f:480,t:1200},{d:[0,6],f:510,t:1200}]},
+  {id:6,  name:'Amáida Café',                 barrio:'Belgrano',    dir:'Virrey del Pino 2047',              lat:-34.564,lon:-58.449,grating:4.8,reviews:122,  work:'laptop', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@amaidacafe',             horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:7,  name:'MELCHA CAFÉ',                 barrio:'Palermo',     dir:'Honduras 3809',                     lat:-34.594,lon:-58.417,grating:4.6,reviews:184,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@melchacoffee',           horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:8,  name:'Sencillo Café',               barrio:'Palermo',     dir:'Billinghurst 2050',                 lat:-34.588,lon:-58.408,grating:4.7,reviews:193,  work:'laptop', pet:'Chequear',brunch:'Chequear',afuera:'Si',sol:'Chequear',llevar:'Si', instagram:'@sencillocafe.ar',  horario_txt:'Lun a Sab 8:00 am - 8:00 pm',                               schedule:[{d:[1,2,3,4,5,6],f:480,t:1200}]},
+  {id:9,  name:'Jaramillo Café - Vidal',      barrio:'Belgrano',    dir:'Manuel Ugarte 2799',                lat:-34.558,lon:-58.466,grating:4.7,reviews:240,  work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@jaramillo.cafe',         horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:10, name:'BLANCA®',                     barrio:'Cañitas',     dir:'Soldado de la Independencia 1177',  lat:-34.565,lon:-58.439,grating:4.2,reviews:1190, work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@blancadecocafe',         horario_txt:'Lun a Sab 9:00 am - 8:00 pm',                               schedule:[{d:[1,2,3,4,5,6],f:540,t:1200}]},
+  {id:11, name:'Solileb',                     barrio:'Colegiales',  dir:'Zapiola 1102',                      lat:-34.574,lon:-58.454,grating:4.6,reviews:857,  work:'laptop', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@solileb',                horario_txt:'Mar a Vier 8:00 am - 8:00 pm // Sab a Dom 9:00 am - 8:00 pm',       schedule:[{d:[2,3,4,5],f:480,t:1200},{d:[0,6],f:540,t:1200}]},
+  {id:12, name:'FORMA Coffee & Roasters',     barrio:'Belgrano',    dir:'Manuel Ugarte 1708',                lat:-34.553,lon:-58.455,grating:4.8,reviews:374,  work:'cowork', pet:'Si',       brunch:'Chequear',afuera:'Si',sol:'Si',llevar:'Si', instagram:'@forma.cafe',             horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:13, name:'Feca Fragata',                barrio:'Flores',      dir:'Fragata Pres. Sarmiento 801',       lat:-34.615,lon:-58.453,grating:4.6,reviews:5692, work:'laptop', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@feca.cafe',              horario_txt:'Mar a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[2,3,4,5,6,0],f:480,t:1200}]},
+  {id:14, name:'Báltica Café',                barrio:'Nuñez',       dir:'Quesada 1798',                      lat:-34.551,lon:-58.457,grating:4.6,reviews:1066, work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@baltica.cafe',           horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:15, name:'Café Razo',                   barrio:'Nuñez',       dir:'Quesada 2347',                      lat:-34.554,lon:-58.463,grating:4.9,reviews:35,   work:'laptop', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@caferazo',               horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:16, name:'Zarpado Café',                barrio:'Olivos',      dir:'Leonardo Rosales 2419',             lat:-34.509,lon:-58.480,grating:4.2,reviews:601,  work:'casual', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@zarpadocafe',            horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:17, name:'Koofi | Café de Especialidad',barrio:'Microcentro', dir:'Av. Corrientes 924',                lat:-34.604,lon:-58.380,grating:4.8,reviews:130,  work:'cowork', pet:'Chequear',brunch:'No', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@koofi.ba',        horario_txt:'Lun a Mier 7:00 am - 9:00 pm // Jue a Sab 7:00 am - 11:00 pm // Dom 8:00 am - 9:00 pm', schedule:[{d:[1,2,3],f:420,t:1260},{d:[4,5,6],f:420,t:1380},{d:[0],f:480,t:1260}]},
+  {id:18, name:'CIC Buenos Aires Coffee',     barrio:'Microcentro', dir:'Av. Corrientes 930',                lat:-34.604,lon:-58.380,grating:4.7,reviews:504,  work:'Chequear',pet:'Chequear',brunch:'Chequear',afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@cicbuenosaires', horario_txt:'Lun a Vier 7:30 am - 10:00 pm // Sab 9:00 am - 10:00 pm',             schedule:[{d:[1,2,3,4,5],f:450,t:1320},{d:[6],f:540,t:1320}]},
+  {id:19, name:'onno café',                   barrio:'Almagro',     dir:'Río de Janeiro 1035',               lat:-34.603,lon:-58.433,grating:4.8,reviews:176,  work:'laptop', pet:'Si',       brunch:'No', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@onno.cafe',              horario_txt:'Mar a Vier 3:30 pm - 8:30 pm // Sab a Dom 10:00 am - 8:30 pm', schedule:[{d:[2,3,4,5],f:930,t:1230},{d:[0,6],f:600,t:1230}]},
+  {id:20, name:'Caversaschi & Co.',           barrio:'Palermo',     dir:'Nicaragua 5510',                    lat:-34.582,lon:-58.433,grating:4.6,reviews:640,  work:'laptop', pet:'Chequear',brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@caversaschico',   horario_txt:'Mar a Dom 9:00 am - 8:30 pm',                            schedule:[{d:[2,3,4,5,6,0],f:540,t:1230}]},
+  {id:21, name:'Presencia Coffee',            barrio:'Recoleta',    dir:'Av. Alvear 1600',                   lat:-34.590,lon:-58.386,grating:4.3,reviews:175,  work:'laptop', pet:'Si',       brunch:'Si', afuera:'No', sol:'No',       llevar:'Si', instagram:'@presenciagrancafe',      horario_txt:'Lun a Vier 8:00 am - 8:00 pm // Sab a Dom 9:00 am - 7:00 pm',           schedule:[{d:[1,2,3,4,5],f:480,t:1200},{d:[0,6],f:540,t:1140}]},
+  {id:22, name:'Chez Janu',                   barrio:'Belgrano',    dir:'Echeverría 1310',                   lat:-34.556,lon:-58.445,grating:4.3,reviews:165,  work:'casual', pet:'Chequear',brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@chezjanu',        horario_txt:'Lun a Dom 8:30 am - 8:00 pm',                           schedule:[{d:[0,1,2,3,4,5,6],f:510,t:1200}]},
+  {id:23, name:'Ciclo Café',                  barrio:'Recoleta',    dir:'Ayacucho 1626',                     lat:-34.591,lon:-58.393,grating:4.8,reviews:306,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@ciclocafe.ok',    horario_txt:'Lun a Vier 7:30 am - 8:00 pm // Sab 8:30 am - 9:00 pm',           schedule:[{d:[1,2,3,4,5],f:450,t:1200},{d:[6],f:510,t:1260}]},
+  {id:24, name:'Planta Baja',                 barrio:'Recoleta',    dir:'Pacheco de Melo 2177',              lat:-34.590,lon:-58.396,grating:4.9,reviews:108,  work:'laptop', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@plantabaja.cafe',        horario_txt:'Lun a Sab 9:00 am - 7:00 pm',                               schedule:[{d:[1,2,3,4,5,6],f:540,t:1140}]},
+  {id:25, name:'Jauría Café',                 barrio:'Belgrano',    dir:'Céspedes 2457',                     lat:-34.569,lon:-58.449,grating:4.5,reviews:173,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@jauriacafe__',           horario_txt:'Lun a Vier 8:00 am - 8:00 pm // Sab a Dom 9:00 am - 8:00 pm',      schedule:[{d:[1,2,3,4,5],f:480,t:1200},{d:[0,6],f:540,t:1200}]},
+  {id:26, name:'Salvaje Bakery',              barrio:'Chacarita',   dir:'Av. Dorrego 1829',                  lat:-34.581,lon:-58.442,grating:4.4,reviews:3115, work:'casual', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@salvajebakery',          horario_txt:'Mar a Dom 8:00 am - 9:00 pm',                               schedule:[{d:[2,3,4,5,6,0],f:480,t:1260}]},
+  {id:27, name:'Medrado Café',                barrio:'Caballito',   dir:'Formosa 791',                       lat:-34.623,lon:-58.439,grating:4.5,reviews:1592, work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@medradocafe',            horario_txt:'Lun a Vier 8:00 am - 8:00 pm // Sab a Dom 9:00 am - 8:30 pm',   schedule:[{d:[1,2,3,4,5],f:480,t:1200},{d:[0,6],f:540,t:1230}]},
+  {id:28, name:'Manada',                      barrio:'Villa Devoto',dir:'Emilio Lamarca 5100',               lat:-34.589,lon:-58.514,grating:4.4,reviews:336,  work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@manadacafedevoto',       horario_txt:'Lun a Vier 8:00 am - 8:00 pm // Sab a Dom 9:00 am - 8:00 pm',           schedule:[{d:[1,2,3,4,5],f:480,t:1200},{d:[0,6],f:540,t:1200}]},
+  {id:29, name:'La Filial Café',              barrio:'Caballito',   dir:'Olaya 1023',                        lat:-34.608,lon:-58.442,grating:4.6,reviews:516,  work:'casual', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@lafilialcafe',           horario_txt:'Lun, Mier, Jue, Vier 8:00 am - 8:00 pm // Sab a Dom 9:00 am - 8:00 pm', schedule:[{d:[1,3,4,5],f:480,t:1200},{d:[0,6],f:540,t:1200}]},
+  {id:30, name:'Cobre Café',                  barrio:'Villa Crespo',dir:'Acevedo 727',                       lat:-34.596,lon:-58.437,grating:4.6,reviews:764,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@cobre.cafe',             horario_txt:'Lun a Dom 9:00 am - 9:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:540,t:1260}]},
+  {id:31, name:'Bodø Café',                   barrio:'Palermo',     dir:'Uriarte 1308',                      lat:-34.589,lon:-58.435,grating:4.5,reviews:206,  work:'laptop', pet:'Si',       brunch:'No', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@bodo.cafe',              horario_txt:'Lun a Sab 8:30 am - 7:30 pm',                         schedule:[{d:[1,2,3,4,5,6],f:510,t:1170}]},
+  {id:32, name:'Kahwa Café',                  barrio:'Caballito',   dir:'Guayaquil 640',                     lat:-34.621,lon:-58.438,grating:4.5,reviews:144,  work:'casual', pet:'Si',       brunch:'Si', afuera:'No', sol:'No',       llevar:'Si', instagram:'@cafe.kahwa',             horario_txt:'Lun a Vier 7:30 am - 8:00 pm // Sab 8:30 am - 8:00 pm // Dom 9:00 am - 8:00 pm', schedule:[{d:[1,2,3,4,5],f:450,t:1200},{d:[6],f:510,t:1200},{d:[0],f:540,t:1200}]},
+  {id:33, name:'Café Rotondo',                barrio:'Palermo',     dir:'Av. Cerviño 3907',                  lat:-34.579,lon:-58.413,grating:4.6,reviews:327,  work:'laptop', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@rotondocafe',            horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:34, name:'Venus Café',                  barrio:'Chacarita',   dir:'Conde 11',                          lat:-34.582,lon:-58.444,grating:4.6,reviews:116,  work:'No',     pet:'Si',       brunch:'No', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@venuscafe_bsas',         horario_txt:'Lun a Vier 8:30 am - 7:00 pm // Sab a Dom 10:00 am - 7:00 pm',       schedule:[{d:[1,2,3,4,5],f:510,t:1140},{d:[0,6],f:600,t:1140}]},
+  {id:35, name:'AHORA Bs.As',                 barrio:'Saavedra',    dir:'Nuñez 3802',                        lat:-34.557,lon:-58.480,grating:4.7,reviews:881,  work:'laptop', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@ahora.bsas',             horario_txt:'Mar a Vier 8:00 pm - 11:59 pm // Sab a Dom 12:00 pm - 11:59 pm',    schedule:[{d:[2,3,4,5],f:1200,t:1439},{d:[0,6],f:720,t:1439}]},
+  {id:36, name:'SOSA Café',                   barrio:'Belgrano',    dir:'Moldes 653',                        lat:-34.573,lon:-58.447,grating:4.1,reviews:249,  work:'cowork', pet:'Chequear',brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@sosa__ba',        horario_txt:'Mar a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[2,3,4,5,6,0],f:480,t:1200}]},
+  {id:37, name:'Nerea Café',                  barrio:'Palermo',     dir:'Bonpland 1621',                     lat:-34.584,lon:-58.438,grating:4.6,reviews:121,  work:'casual', pet:'Chequear',brunch:'Si', afuera:'Chequear',sol:'No',    llevar:'Si', instagram:'@cafenerea',              horario_txt:'Mar a Sab 8:00 am - 8:00 pm // Dom 10:00 am - 8:00 pm',                  schedule:[{d:[2,3,4,5,6],f:480,t:1200},{d:[0],f:600,t:1200}]},
+  {id:38, name:'Rondó Café',                  barrio:'Recoleta',    dir:'Uruguay 1048',                      lat:-34.596,lon:-58.387,grating:4.5,reviews:1531, work:'laptop', pet:'Si',       brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@rondddocafe',     horario_txt:'Lun a Sab 8:00 am - 8:00 pm',                               schedule:[{d:[1,2,3,4,5,6],f:480,t:1200}]},
+  {id:39, name:'Rita Specialty Coffee Vuelta',barrio:'Belgrano',    dir:'Vuelta de Obligado 1183',           lat:-34.568,lon:-58.447,grating:4.9,reviews:5582, work:'laptop', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@ritaspecialitycoffee',   horario_txt:'Lun a Dom 8:00 am - 8:30 pm',                            schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1230}]},
+  {id:40, name:'Al Diablo Coffee Roasters',   barrio:'Palermo',     dir:'Costa Rica 4752',                   lat:-34.588,lon:-58.428,grating:4.5,reviews:1119, work:'laptop', pet:'Si',       brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@aldiablo.coffeeroasters', horario_txt:'Lun a Vier 9:00 am - 8:00 pm // Sab a Dom 9:30 am - 8:30 pm', schedule:[{d:[1,2,3,4,5],f:540,t:1200},{d:[0,6],f:570,t:1230}]},
+  {id:41, name:'The Shelter Coffee',          barrio:'Palermo',     dir:'Virrey Loreto 2035',                lat:-34.565,lon:-58.448,grating:4.7,reviews:958,  work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@thesheltercoffee',       horario_txt:'Lun a Vier 8:00 am - 8:00 pm // Sab a Dom 8:30 am - 8:00 pm',        schedule:[{d:[1,2,3,4,5],f:480,t:1200},{d:[0,6],f:510,t:1200}]},
+  {id:42, name:'Crecia Bollería',             barrio:'Recoleta',    dir:'Juncal 2179',                       lat:-34.592,lon:-58.398,grating:4.5,reviews:396,  work:'casual', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@creciabolleria.ba',      horario_txt:'Lun a Sab 8:00 am - 8:00 pm',                               schedule:[{d:[1,2,3,4,5,6],f:480,t:1200}]},
+  {id:43, name:'CUADRA',                      barrio:'Palermo',     dir:'Concepción Arenal 2629',            lat:-34.576,lon:-58.440,grating:4.4,reviews:893,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@cuadrarestaurant',       horario_txt:'Lun a Dom 9:00 am - 8:00 pm',                              schedule:[{d:[0,1,2,3,4,5,6],f:540,t:1200}]},
+  {id:44, name:'Oli',                         barrio:'Palermo',     dir:'Costa Rica 6020',                   lat:-34.579,lon:-58.439,grating:4.2,reviews:2603, work:'casual', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@oli_buenosaires',        horario_txt:'Lun a Dom 9:00 am - 7:00 pm',                              schedule:[{d:[0,1,2,3,4,5,6],f:540,t:1140}]},
+  {id:45, name:'Anchoíta Panadería',          barrio:'Chacarita',   dir:'Aguirre 1562',                      lat:-34.589,lon:-58.445,grating:4.6,reviews:1305, work:'casual', pet:'Chequear',brunch:'Chequear',afuera:'Chequear',sol:'Si',llevar:'Chequear',instagram:'@panaderiadeanchoita', horario_txt:'Mier a Dom 9:00 am - 7:00 pm',                          schedule:[{d:[3,4,5,6,0],f:540,t:1140}]},
+  {id:46, name:'La Ventana x Anafe',          barrio:'Chacarita',   dir:'Arévalo 1375',                      lat:-34.584,lon:-58.444,grating:4.4,reviews:615,  work:'casual', pet:'Chequear',brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@laventana.anafe',        horario_txt:'Lun a Dom 9:00 am - 8:00 pm',                               schedule:[{d:[0,1,2,3,4,5,6],f:540,t:1200}]},
+  {id:47, name:'Hobby - Café de Especialidad',barrio:'Chacarita',   dir:'Guevara 91',                        lat:-34.588,lon:-58.447,grating:4.7,reviews:1569, work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@hobbycafe.ba',           horario_txt:'Lun a Vier 8:00 am - 8:00 pm // Sab a Dom 9:30 am - 8:30 pm',     schedule:[{d:[1,2,3,4,5],f:480,t:1200},{d:[0,6],f:570,t:1230}]},
+  {id:48, name:'Cuervo Café',                 barrio:'Palermo',     dir:'El Salvador 4580',                  lat:-34.590,lon:-58.426,grating:4.6,reviews:3676, work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@cuervocafe',             horario_txt:'Mar a Dom 8:00 am - 8:00 pm',                               schedule:[{d:[2,3,4,5,6,0],f:480,t:1200}]},
+  {id:49, name:'TIENDA ROLAND',               barrio:'Palermo',     dir:'Malabia 1659',                      lat:-34.590,lon:-58.426,grating:4.6,reviews:139,  work:'laptop', pet:'Chequear',brunch:'No', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@tiendaroland',           horario_txt:'Lun a Dom 1:30 pm - 8:00 pm',                          schedule:[{d:[0,1,2,3,4,5,6],f:810,t:1200}]},
+  {id:50, name:'Cafe Gutierrez',              barrio:'Recoleta',    dir:'Juan María Gutiérrez 2637',         lat:-34.587,lon:-58.400,grating:4.2,reviews:873,  work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@cafe_gutierrez',         horario_txt:'Lun a Mier 7:30 am - 9:00 pm // Jue a Vier 7:30 am - 11:59 pm // Sab 8:30 am - 11:59 pm // Dom 8:30 am - 9:00 pm', schedule:[{d:[1,2,3],f:450,t:1260},{d:[4,5],f:450,t:1439},{d:[6],f:510,t:1439},{d:[0],f:510,t:1260}]},
+  {id:51, name:'Lharmonie',                   barrio:'Palermo',     dir:'Av. del Libertador 3118',           lat:-34.577,lon:-58.412,grating:4.3,reviews:1263, work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@lharmonie__',            horario_txt:'Lun, Mar, Mier, Jue, Dom 9:00 am - 11:00 pm // Vier 9:00 am - 7:00 pm',                  schedule:[{d:[0,1,2,3,4],f:540,t:1380},{d:[5],f:540,t:1140}]},
+  {id:52, name:'CAFECITO - Tiny Coffee Shop', barrio:'Colegiales',  dir:'Zapata 500',                        lat:-34.573,lon:-58.443,grating:4.2,reviews:401,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@cafecito.tcs',           horario_txt:'Lun a Vier 8:30 am - 8:00 pm // Sab 9:30 am - 7:00 pm',           schedule:[{d:[1,2,3,4,5],f:510,t:1200},{d:[6],f:570,t:1140}]},
+
+  // ── SUCURSALES NUEVAS (coordenadas verificadas) ──────────────
+  {id:53, name:'SĀNTAL - Colegiales',               barrio:'Colegiales',  dir:'Conde 1200',                        lat:-34.5751,lon:-58.4559,grating:4.6,reviews:7134, work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@santalcafe',             horario_txt:'Lun 8:00 am - 10:00 pm // Mar a Sab 7:30 am - 8:30 pm // Dom 7:30 am - 8:30 pm', schedule:[{d:[1],f:480,t:1320},{d:[2,3,4,5,6,0],f:450,t:1230}]},
+  {id:54, name:'SĀNTAL - Chacarita',                barrio:'Chacarita',   dir:'Loyola 1599',                       lat:-34.5875,lon:-58.4441,grating:4.9,reviews:62,   work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@santalcafe',             horario_txt:'Lun a Dom 7:30 am - 8:30 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:450,t:1230}]},
+  {id:55, name:'Barragán - Saavedra',                barrio:'Saavedra',    dir:'Superí 4301',                       lat:-34.5484,lon:-58.4822,grating:4.7,reviews:893,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@barragan.cafe',          horario_txt:'Lun a Sab 8:30 am - 8:00 pm // Dom 9:30 am - 7:30 pm', schedule:[{d:[1,2,3,4,5,6],f:510,t:1200},{d:[0],f:570,t:1170}]},
+  {id:56, name:'Barragán - Caballito',               barrio:'Caballito',   dir:'Nicasio Oroño 1195',                lat:-34.6112,lon:-58.4565,grating:4.7,reviews:2710, work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@barragan.cafe',          horario_txt:'Lun a Sab 8:30 am - 8:00 pm // Dom 9:30 am - 7:30 pm', schedule:[{d:[1,2,3,4,5,6],f:510,t:1200},{d:[0],f:570,t:1170}]},
+  {id:57, name:'Cosecha Almagro',                    barrio:'Almagro',     dir:'Av. Hipólito Yrigoyen 4102',        lat:-34.6149,lon:-58.4246,grating:4.3,reviews:838,  work:'casual', pet:'Chequear', brunch:'Chequear',afuera:'Si',sol:'Chequear',llevar:'Si', instagram:'@cosechaok',              horario_txt:'Lun a Dom 9:00 am - 9:00 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:540,t:1260}]},
+  {id:58, name:'Cosecha San Telmo',                  barrio:'San Telmo',   dir:'Defensa 1001',                      lat:-34.6196,lon:-58.3716,grating:4.0,reviews:371,  work:'No',     pet:'Chequear', brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@cosechaok',             horario_txt:'Lun a Vier 9:00 am - 8:30 pm // Sab y Dom 9:00 am - 9:30 pm', schedule:[{d:[1,2,3,4,5],f:540,t:1230},{d:[0,6],f:540,t:1290}]},
+  {id:59, name:'Jaramillo Café - Nuñez',             barrio:'Nuñez',       dir:'11 de Septiembre 3700',             lat:-34.5449,lon:-58.4622,grating:4.6,reviews:681,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@jaramillo.cafe',          horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:60, name:'BLANCA® Palermo',                    barrio:'Palermo',     dir:'Sinclair 3136',                     lat:-34.5736,lon:-58.4228,grating:4.3,reviews:1251, work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@blancadecocafe',          horario_txt:'Lun a Sab 9:00 am - 8:00 pm',                  schedule:[{d:[1,2,3,4,5,6],f:540,t:1200}]},
+  {id:61, name:'BLANCA® Recoleta',                   barrio:'Recoleta',    dir:'Tagle 2589',                        lat:-34.5838,lon:-58.3999,grating:4.2,reviews:225,  work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'No',       llevar:'Si', instagram:'@blancadecocafe',          horario_txt:'Lun a Sab 9:00 am - 8:00 pm',                  schedule:[{d:[1,2,3,4,5,6],f:540,t:1200}]},
+  {id:62, name:'Feca Madero',                        barrio:'Puerto Madero',dir:'Macacha Güemes 260',               lat:-34.6049,lon:-58.3652,grating:4.9,reviews:34,   work:'casual', pet:'Chequear', brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@feca.cafe',               horario_txt:'Lun a Vier 7:30 am - 7:30 pm // Sab y Dom 9:30 am - 7:30 pm', schedule:[{d:[1,2,3,4,5],f:450,t:1170},{d:[0,6],f:570,t:1170}]},
+  {id:63, name:'Feca Valle',                         barrio:'Caballito',   dir:'Valle 1101',                        lat:-34.6252,lon:-58.4435,grating:4.7,reviews:2394, work:'laptop', pet:'Chequear', brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@feca.cafe',               horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:64, name:'FORMA - Nuñez',                      barrio:'Nuñez',       dir:'Ramallo 2268',                      lat:-34.5423,lon:-58.4709,grating:4.7,reviews:760,  work:'cowork', pet:'Si',       brunch:'Chequear',afuera:'Si',sol:'Si',    llevar:'Si', instagram:'@forma.cafe',              horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:65, name:'Café Razo - Besares',                barrio:'Nuñez',       dir:'Besares 2299',                      lat:-34.5445,lon:-58.4697,grating:4.7,reviews:231,  work:'laptop', pet:'Chequear', brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@caferazo',             horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:66, name:'Zarpado Café - Acassuso',            barrio:'Acassuso',    dir:'Av. del Libertador 14656',          lat:-34.4781,lon:-58.4959,grating:4.4,reviews:19,   work:'casual', pet:'Chequear', brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@zarpadocafe',             horario_txt:'Lun a Dom 8:00 am - 8:00 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1200}]},
+  {id:67, name:'Kahwa Café - Palermo',               barrio:'Palermo',     dir:'Jerónimo Salguero 2052',            lat:-34.5865,lon:-58.4128,grating:4.8,reviews:143,  work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@cafe.kahwa',              horario_txt:'Lun a Vier 7:30 am - 8:00 pm // Sab 8:30 am - 8:00 pm // Dom 9:00 am - 8:00 pm', schedule:[{d:[1,2,3,4,5],f:450,t:1200},{d:[6],f:510,t:1200},{d:[0],f:540,t:1200}]},
+  {id:68, name:'Kahwa Café - Belgrano',              barrio:'Belgrano',    dir:'3 de Febrero 2170',                 lat:-34.5588,lon:-58.4527,grating:4.8,reviews:41,   work:'laptop', pet:'Si',       brunch:'Chequear',afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@cafe.kahwa',      horario_txt:'Lun a Vier 8:30 am - 7:00 pm // Vier y Sab 8:30 am - 8:00 pm // Dom 9:30 am - 8:00 pm', schedule:[{d:[1,2,3,4],f:510,t:1140},{d:[5,6],f:510,t:1200},{d:[0],f:570,t:1200}]},
+  {id:69, name:'Cuervo Café - Belgrano',             barrio:'Belgrano',    dir:'Av. Juramento 1284',                lat:-34.5553,lon:-58.4452,grating:4.4,reviews:1060, work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@cuervocafe',              horario_txt:'Mar a Dom 8:00 am - 8:00 pm',                  schedule:[{d:[2,3,4,5,6,0],f:480,t:1200}]},
+  {id:70, name:'Cuervo Café - Palermo Off',          barrio:'Palermo',     dir:'Arenales 3339',                     lat:-34.5874,lon:-58.4101,grating:4.3,reviews:93,   work:'No',     pet:'Si',       brunch:'No', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@cuervocafe',              horario_txt:'Mar a Dom 8:00 am - 8:00 pm',                  schedule:[{d:[2,3,4,5,6,0],f:480,t:1200}]},
+  {id:71, name:'Cuervo Café - Chacarita',            barrio:'Chacarita',   dir:'Guevara 393',                       lat:-34.5869,lon:-58.4500,grating:4.4,reviews:1099, work:'laptop', pet:'Si',       brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@cuervocafe',           horario_txt:'Mar a Dom 8:00 am - 8:00 pm',                  schedule:[{d:[2,3,4,5,6,0],f:480,t:1200}]},
+  {id:72, name:'Cuervo Café - Costa Rica',           barrio:'Palermo',     dir:'Costa Rica 5801',                   lat:-34.5809,lon:-58.4367,grating:4.5,reviews:1729, work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@cuervocafe',              horario_txt:'Mar a Dom 8:00 am - 8:00 pm',                  schedule:[{d:[2,3,4,5,6,0],f:480,t:1200}]},
+  {id:73, name:'Lharmonie - Belgrano',               barrio:'Belgrano',    dir:'Zabala 1925',                       lat:-34.5648,lon:-58.4449,grating:4.3,reviews:93,   work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@lharmonie__',             horario_txt:'Lun a Jue 9:00 am - 8:00 pm // Vier 9:00 am - 6:00 pm // Dom 10:00 am - 8:00 pm', schedule:[{d:[1,2,3,4],f:540,t:1200},{d:[5],f:540,t:1080},{d:[0],f:600,t:1200}]},
+  {id:74, name:'Lharmonie - Cañitas',                barrio:'Cañitas',     dir:'Maure 1516',                        lat:-34.5652,lon:-58.4346,grating:4.2,reviews:183,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@lharmonie__',             horario_txt:'Lun a Jue 9:00 am - 8:00 pm // Vier 9:00 am - 5:30 pm // Dom 10:00 am - 8:00 pm', schedule:[{d:[1,2,3,4],f:540,t:1200},{d:[5],f:540,t:1050},{d:[0],f:600,t:1200}]},
+  {id:75, name:'Lharmonie - Palermo Hollywood',      barrio:'Palermo',     dir:'Nicaragua 6068',                    lat:-34.5780,lon:-58.4385,grating:4.4,reviews:404,  work:'laptop', pet:'Si',       brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@lharmonie__',          horario_txt:'Lun a Jue 9:00 am - 8:00 pm // Vier 9:00 am - 5:30 pm // Dom 10:00 am - 8:00 pm', schedule:[{d:[1,2,3,4],f:540,t:1200},{d:[5],f:540,t:1050},{d:[0],f:600,t:1200}]},
+  {id:76, name:'Hobby - Palermo',                    barrio:'Palermo',     dir:'Malabia 1343',                      lat:-34.5927,lon:-58.4297,grating:4.6,reviews:888,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@hobbycafe.ba',            horario_txt:'Lun a Dom 7:30 am - 9:30 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:450,t:1290}]},
+  {id:77, name:'Rita Specialty Coffee - Soler',      barrio:'Palermo',     dir:'Soler 6093',                        lat:-34.5768,lon:-58.4376,grating:4.8,reviews:10217,work:'laptop', pet:'Chequear', brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@ritaspecialitycoffee',    horario_txt:'Lun a Dom 8:00 am - 8:30 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1230}]},
+  {id:78, name:'Rita Specialty Coffee - Matienzo',   barrio:'Belgrano',    dir:'Matienzo 2489',                     lat:-34.5735,lon:-58.4406,grating:4.8,reviews:4756, work:'laptop', pet:'Chequear', brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@ritaspecialitycoffee',    horario_txt:'Lun a Dom 8:00 am - 8:30 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1230}]},
+  {id:79, name:'Rita Specialty Coffee - Amenábar',   barrio:'Nuñez',       dir:'Amenábar 3361',                     lat:-34.5522,lon:-58.4683,grating:4.8,reviews:8466, work:'laptop', pet:'Chequear', brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@ritaspecialitycoffee',    horario_txt:'Lun a Dom 8:00 am - 8:30 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1230}]},
+  {id:80, name:'Rita Specialty Coffee - 11 de Sep.', barrio:'Nuñez',       dir:'11 de Septiembre 4050',             lat:-34.5422,lon:-58.4640,grating:4.8,reviews:6408, work:'laptop', pet:'Chequear', brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@ritaspecialitycoffee',    horario_txt:'Lun a Dom 8:00 am - 8:30 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1230}]},
+  {id:81, name:'Rita Specialty Coffee - Sinclair',   barrio:'Palermo',     dir:'Sinclair 3096',                     lat:-34.5740,lon:-58.4232,grating:4.8,reviews:2449, work:'casual', pet:'Chequear', brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@ritaspecialitycoffee',    horario_txt:'Lun a Dom 8:00 am - 8:30 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:480,t:1230}]},
+  {id:82, name:'CAFECITO - Palermo',                 barrio:'Palermo',     dir:'Charcas 4997',                      lat:-34.5793,lon:-58.4288,grating:4.3,reviews:471,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Chequear',sol:'Chequear',llevar:'Si', instagram:'@cafecito.tcs',          horario_txt:'Lun a Vier 8:30 am - 8:00 pm // Sab 9:30 am - 8:00 pm // Dom 9:30 am - 7:00 pm', schedule:[{d:[1,2,3,4,5],f:510,t:1200},{d:[6],f:570,t:1200},{d:[0],f:570,t:1140}]},
+  {id:83, name:'Medrado Café - Cañitas',             barrio:'Cañitas',     dir:'Báez 795',                          lat:-34.5691,lon:-58.4360,grating:4.7,reviews:670,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Chequear',llevar:'Si', instagram:'@medradocafe',             horario_txt:'Lun a Vier 8:30 am - 8:00 pm // Sab y Dom 9:00 am - 8:00 pm', schedule:[{d:[1,2,3,4,5],f:510,t:1200},{d:[0,6],f:540,t:1200}]},
+  {id:84, name:'Cafe Gutierrez - Caballito',         barrio:'Caballito',   dir:'Viel 582',                          lat:-34.6238,lon:-58.4318,grating:4.3,reviews:212,  work:'laptop', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@cafe_gutierrez',          horario_txt:'Lun a Mier 7:30 am - 9:00 pm // Jue y Vier 7:30 am - 12:00 am // Sab 8:30 am - 12:00 am // Dom 8:30 am - 9:00 pm', schedule:[{d:[1,2,3],f:450,t:1260},{d:[4,5],f:450,t:1439},{d:[6],f:510,t:1439},{d:[0],f:510,t:1260}]},
+  {id:85, name:'Cobre Café - Palermo',              barrio:'Palermo',     dir:'Gorriti 5070',                      lat:-34.5890,lon:-58.4319,grating:4.5,reviews:345,  work:'casual', pet:'Si',       brunch:'Si', afuera:'Si', sol:'Si',       llevar:'Si', instagram:'@cobre.cafe',             horario_txt:'Lun a Dom 9:00 am - 8:00 pm',                  schedule:[{d:[0,1,2,3,4,5,6],f:540,t:1200}]}
+]; // _CAFES_LEGACY — solo como fallback
+
+let uLat=null,uLon=null,filts=new Set(),view='list',mapOk=false,pins={},uM=null,lmap;
+
+// ── HORARIO ──────────────────────────────────────────────
+function nowMin(){
+  // hora local Buenos Aires (UTC-3)
+  const d=new Date();
+  const ba=new Date(d.toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));
+  return ba.getDay()*0+ba.getHours()*60+ba.getMinutes(); // minutos del dia, dia de semana separado
+}
+function nowDayMin(){
+  const d=new Date();
+  const ba=new Date(d.toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));
+  return {day:ba.getDay(), min:ba.getHours()*60+ba.getMinutes()};
+}
+function isOpenNow(c){
+  if(!c.schedule||!c.schedule.length) return null; // desconocido
+  const {day,min}=nowDayMin();
+  for(const slot of c.schedule){
+    if(slot.d.includes(day)){
+      if(slot.t>=slot.f){ // no cruza medianoche
+        if(min>=slot.f && min<slot.t) return true;
+      } else { // cruza medianoche
+        if(min>=slot.f || min<slot.t) return true;
+      }
+      return false; // está el día pero fuera de horario
+    }
+  }
+  return false; // día no encontrado = cerrado
+}
+function openBadge(c){
+  const s=isOpenNow(c);
+  if(s===null) return '<span class="open-badge unk">Horario ?</span>';
+  return s?'<span class="open-badge open">● Abierto</span>':'<span class="open-badge closed">● Cerrado</span>';
+}
+function openPill(c){
+  const s=isOpenNow(c);
+  if(s===null) return '<span class="pp a">🕐 Horario sin datos</span>';
+  return s?'<span class="pp open-now">🟢 Abierto ahora</span>':'<span class="pp closed-now">🔴 Cerrado ahora</span>';
+}
+
+// ── WORK LABEL ───────────────────────────────────────────
+const WORK_LABEL={'cowork':'🟣 Cowork friendly','laptop':'💻 Laptop friendly','casual':'☕ Casual work'};
+const WORK_TAG  ={'cowork':'cowork','laptop':'laptop','casual':'casual'};
+
+function workTag(w){
+  if(!WORK_LABEL[w]) return '';
+  return `<span class="tag ${WORK_TAG[w]}">${WORK_LABEL[w]}</span>`;
+}
+function workPill(w){
+  if(!WORK_LABEL[w]) return w==='No'?'<span class="pp r">💻 No work friendly</span>':'';
+  return `<span class="pp ${WORK_TAG[w]}">${WORK_LABEL[w]}</span>`;
+}
+
+function hav(a,b,c,d){const R=6371e3,f1=a*Math.PI/180,f2=c*Math.PI/180,df=(c-a)*Math.PI/180,dl=(d-b)*Math.PI/180,x=Math.sin(df/2)**2+Math.cos(f1)*Math.cos(f2)*Math.sin(dl/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+const dist=hav;
+function fd(m){return m<1000?`${Math.round(m)} m`:`${(m/1000).toFixed(1)} km`}
+function upd(){if(uLat)CAFES.forEach(c=>c._d=hav(uLat,uLon,c.lat,c.lon))}
+function sd(s){return!s?'dn':s>=4.5?'dg':s>=4.0?'da':'dr'}
+function sc(s){return!s?'n':s>=4.5?'g':s>=4.0?'a':'r'}
+function tc(v){return v==='Si'?'g':v==='No'?'r':'a'}
+
+function getList(){
+  const q=document.getElementById('srch').value.toLowerCase().trim();
+  let l=CAFES.filter(c=>{
+    if(q&&!c.name.toLowerCase().includes(q)&&!c.barrio.toLowerCase().includes(q))return false;
+    if(filts.has('favs')   && !isFav(c.id)) return false;
+    if(filts.has('open')   && isOpenNow(c)!==true) return false;
+    if(filts.has('work')   && !['cowork','laptop','casual'].includes(c.work)) return false;
+    if(filts.has('pet')    && c.pet!=='Si') return false;
+    if(filts.has('brunch') && c.brunch!=='Si') return false;
+    if(filts.has('afuera') && c.afuera!=='Si') return false;
+    if(filts.has('sol')    && c.sol!=='Si') return false;
+    if(filts.has('score4') && !(c.grating&&c.grating>=4.5)) return false;
+    return true;
+  });
+  if(uLat) l.sort((a,b)=>(a._d||9e9)-(b._d||9e9));
+  else     l.sort((a,b)=>(b.grating||0)-(a.grating||0));
+  return l;
+}
+
+function render(){
+  const list=getList();
+  const lv=document.getElementById('listView');
+  document.getElementById('rlbl').textContent=
+    uLat?`${list.length} cafés · ordenados por distancia`:`${list.length} cafés`;
+
+  lv.querySelectorAll('.card,.empty').forEach(e=>e.remove());
+
+  if(!list.length){
+    const e=document.createElement('div');
+    e.className='empty';e.textContent='Ningún café con ese filtro ☕';
+    lv.appendChild(e);return;
+  }
+
+  list.forEach((c,i)=>{
+    const photo=PHOTOS[c.id%PHOTOS.length];
+    const gr=c.grating?c.grating.toFixed(1):'—';
+    const dist=c._d?` · ${fd(c._d)}`:'';
+    const tags=[];
+    const wt=workTag(c.work); if(wt) tags.push(wt);
+    if(c.pet==='Si')             tags.push('<span class="tag g">🐾 Pet</span>');
+    if(c.brunch==='Si')          tags.push('<span class="tag g">🥐 Brunch</span>');
+    if(c.afuera==='Si')          tags.push('<span class="tag g">🌳 Outdoor</span>');
+    if(c.sol==='Si')             tags.push('<span class="tag a">☀️ Sol</span>');
+
+    const card=document.createElement('div');
+    card.className='card';
+    card.innerHTML=`
+      <div class="card-photo">
+        <img src="${photo}" alt="${c.name}" loading="lazy">
+        ${openBadge(c)}
+        <div class="card-badge"><span class="dot ${sd(c.grating)}"></span>★ ${gr}</div>
+        <div class="card-text">
+          <div class="card-name">${c.name}</div>
+          <div class="card-loc">📍 ${c.barrio}${dist}</div>
+        </div>
+      </div>
+      <div class="card-strip">${tags.length?tags.join(''):'<span class="tag dim">Completando info…</span>'}</div>`;
+    card.onclick=()=>openPanel(c.id);
+    lv.appendChild(card);
+  });
+  updateMapPins();
+}
+
+function clearFilts(){
+  filts.clear();
+  document.querySelectorAll('.chips .chip[data-f]').forEach(c=>c.classList.remove('on'));
+  document.getElementById('clearBtn').style.display='none';
+  render();
+}
+function fc(el,f){
+  if(filts.has(f)){ filts.delete(f); el.classList.remove('on'); }
+  else { filts.add(f); el.classList.add('on'); }
+  document.getElementById('clearBtn').style.display=filts.size?'flex':'none';
+  render();
+}
+
+function switchView(){
+  view=view==='list'?'map':'list';
+  const isMap=view==='map';
+  document.getElementById('listView').classList.toggle('hidden',isMap);
+  document.getElementById('mapView').classList.toggle('visible',isMap);
+  document.getElementById('mapBtn').classList.toggle('on',isMap);
+  document.getElementById('locBtn').classList.toggle('hide',!isMap);
+  document.body.style.overflow=isMap?'hidden':'';
+  if(isMap)initMap();
+}
+
+function initMap(){
+  if(mapOk)return;mapOk=true;
+  lmap=L.map('map',{center:[-34.583,-58.437],zoom:13,zoomControl:true,attributionControl:false});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(lmap);
+  CAFES.forEach((c)=>{
+    const el=document.createElement('div');
+    el.className='pin';
+    el.innerHTML='☕';
+    const icon=L.divIcon({html:el,className:'',iconSize:[34,34],iconAnchor:[17,17]});
+    const m=L.marker([c.lat,c.lon],{icon}).addTo(lmap);
+    m.bindPopup(mkPU(c,PHOTOS[c.id%PHOTOS.length]),{maxWidth:240,minWidth:240,closeButton:false});
+    m.on('click',()=>{Object.values(pins).forEach(x=>x.el.classList.remove('sel'));el.classList.add('sel')});
+    pins[c.id]={marker:m,el};
+  });
+  lmap.on('click',()=>Object.values(pins).forEach(x=>x.el.classList.remove('sel')));
+  updateMapPins();
+}
+
+function updateMapPins(){
+  if(!mapOk) return;
+  const visible = new Set(getList().map(c=>c.id));
+  Object.entries(pins).forEach(([id, {marker, el}])=>{
+    if(visible.has(Number(id))){
+      if(!lmap.hasLayer(marker)) marker.addTo(lmap);
+      el.style.opacity='1';
+      el.style.pointerEvents='';
+    } else {
+      lmap.closePopup();
+      if(lmap.hasLayer(marker)) lmap.removeLayer(marker);
+    }
+  });
+}
+
+function mkPU(c,ph){
+  const gr=c.grating?`★ ${c.grating.toFixed(1)}`:'Sin datos';
+  const dist=c._d?`<span class="pu-dist">📍 ${fd(c._d)}</span>`:'';
+  const tags=[];
+  if(['cowork','laptop','casual'].includes(c.work)) tags.push(`<span class="pu-tag ${c.work}">${WORK_LABEL[c.work]}</span>`);
+  if(c.pet==='Si')    tags.push('<span class="pu-tag g">🐾 Pet</span>');
+  if(c.brunch==='Si') tags.push('<span class="pu-tag g">🥐 Brunch</span>');
+  if(c.afuera==='Si') tags.push('<span class="pu-tag g">🌳 Outdoor</span>');
+  if(!tags.length)    tags.push('<span class="pu-tag">☕ Specialty</span>');
+  return`<div>
+    <div class="pu-img"><img src="${ph}" alt="${c.name}"></div>
+    <div class="pu-body">
+      <div class="pu-name-body">${c.name}</div>
+      <div class="pu-barrio-body">${c.barrio}</div>
+      <div class="pu-row" style="margin-top:8px"><div class="pu-score"><span class="dot ${sd(c.grating)}" style="width:8px;height:8px;border-radius:50%;display:inline-block"></span>${gr}</div>${dist}</div>
+      <div class="pu-tags">${tags.join('')}</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="pu-btn" style="flex:1" onclick="openPanel(${c.id});this.closest('.leaflet-popup').querySelector('.leaflet-popup-close-button')&&this.closest('.leaflet-popup').querySelector('.leaflet-popup-close-button').click()">Ver perfil →</button>
+        <button class="pu-fav-btn ${isFav(c.id)?'on':''}" data-id="${c.id}" onclick="toggleFavPopup(${c.id},this)" title="${isFav(c.id)?'Quitar de guardados':'Guardar'}">${isFav(c.id)?'❤️':'🤍'}</button>
+      </div>
+
+    </div>
+  </div>`;
+}
+
+function openPanel(id){
+  // Cerrar cualquier popup de Leaflet abierto
+  if(mapOk && lmap) lmap.closePopup();
+  const c=CAFES.find(x=>x.id===id);
+  if(!c)return;
+
+  document.getElementById('pName').textContent=c.name;
+  document.getElementById('pBarrio').textContent=`${c.barrio} · Buenos Aires`;
+  document.getElementById('pImgEl').src=PHOTOS[c.id%PHOTOS.length];
+  document.getElementById('pImgEl').alt=c.name;
+
+  const distLine = (() => {
+    if(uLat && uLon && c.lat && c.lon){
+      const meters = dist(uLat, uLon, c.lat, c.lon);
+      return `<div class="p-addr">📍 ${fd(meters)} de tu ubicación</div>`;
+    }
+    return '';
+  })();
+
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lon}&travelmode=walking`;
+  const comoLlegarBtn = `<a class="p-directions-btn" href="${mapsUrl}" target="_blank" rel="noopener noreferrer">🗺️ Cómo llegar</a>`;
+
+  const pills=[
+    openPill(c),
+    workPill(c.work),
+    c.pet==='Si'?'<span class="pp g">🐾 Pet friendly</span>':c.pet==='No'?'<span class="pp r">🐾 No pet</span>':'<span class="pp a">🐾 Pet: chequear</span>',
+    c.brunch==='Si'?'<span class="pp g">🥐 Brunch</span>':c.brunch==='No'?'':'<span class="pp a">🥐 Brunch: chequear</span>',
+    c.afuera==='Si'?'<span class="pp g">🌳 Outdoor seating</span>':c.afuera==='No'?'<span class="pp r">🌳 Sin outdoor</span>':'<span class="pp a">🌳 Outdoor: chequear</span>',
+    c.sol==='Si'?'<span class="pp a">☀️ Sol</span>':c.sol==='No'?'':'<span class="pp a">☀️ Sol: chequear</span>',
+  ].filter(Boolean).join('');
+
+  const igSvg=`<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px;flex-shrink:0"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>`;
+  const igHandle=c.instagram?c.instagram.replace('@',''):'';
+  const ig=c.instagram?`<a class="p-ig" href="https://instagram.com/${igHandle}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">${igSvg}${c.instagram}</a>`:'';
+  const horario=c.horario_txt?`<div class="p-addr">🕐 ${c.horario_txt}</div>`:'';
+
+  const favOnPanel = isFav(c.id);
+  document.getElementById('pBody').innerHTML=`
+    <div class="p-sbox">
+      <div><div class="pl">Rating Google</div><div class="pv ${sc(c.grating)}">${c.grating?c.grating.toFixed(1):'—'}</div></div>
+      <div><div class="pg">${c.reviews?c.reviews.toLocaleString()+' reviews':''}</div><div class="pgs">${c.reviews?'Google Maps':''}</div></div>
+    </div>
+    <button id="pFavBtn" class="p-fav-btn ${isFav(c.id)?'on':''}" data-id="${c.id}" onclick="toggleFav(${c.id})">
+      ${isFav(c.id)?'❤️ Guardado':currentUser?'🤍 Guardar café':'🤍 Guardar café'}
+    </button>
+    <div class="psec">Info</div>
+    <div class="p-pills">${pills}</div>
+    ${distLine}
+    <div class="p-addr">📌 ${c.dir}, CABA</div>
+    ${horario}
+    ${comoLlegarBtn}
+    ${ig}
+    <div class="psec">Tu reseña</div>
+    <div class="stars" id="pStars">
+      ${[1,2,3,4,5].map(n=>`<span class="star" onclick="rs(${n})">★</span>`).join('')}
+    </div>
+    <textarea class="rta" rows="3" placeholder="Contá tu experiencia..."></textarea>
+    <button class="sbtn">Enviar reseña ☕</button>`;
+
+  document.getElementById('panel').classList.add('on');
+  document.getElementById('bd').classList.add('on');
+}
+
+function closeP(){
+  document.getElementById('panel').classList.remove('on');
+  document.getElementById('bd').classList.remove('on');
+}
+function rs(n){document.querySelectorAll('#pStars .star').forEach((s,i)=>s.classList.toggle('on',i<n))}
+
+function locate(){
+  navigator.geolocation&&navigator.geolocation.getCurrentPosition(p=>{
+    uLat=p.coords.latitude;uLon=p.coords.longitude;upd();render();
+    if(mapOk){
+      if(uM)lmap.removeLayer(uM);
+      const el=document.createElement('div');el.style.position='relative';
+      el.innerHTML='<div class="upulse"></div><div class="udot"></div>';
+      uM=L.marker([uLat,uLon],{icon:L.divIcon({html:el,className:'',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(lmap);
+      lmap.setView([uLat,uLon],14,{animate:true});
+    }
+  },()=>{uLat=-34.59;uLon=-58.43;upd();render()});
+}
+
+
+// ── MENU ──────────────────────────────────────────────────
+function openMenu(){
+  document.getElementById('sideMenu').classList.add('on');
+  document.getElementById('menuOverlay').classList.add('on');
+}
+function closeMenu(){
+  document.getElementById('sideMenu').classList.remove('on');
+  document.getElementById('menuOverlay').classList.remove('on');
+}
+
+// ── MODALES ───────────────────────────────────────────────
+function openModal(id){
+  document.getElementById(id).classList.add('on');
+}
+function closeModal(id){
+  document.getElementById(id).classList.remove('on');
+}
+function closeModalOutside(e,id){
+  if(e.target===document.getElementById(id)) closeModal(id);
+}
+
+// ── SUGERIR ───────────────────────────────────────────────
+function submitSuggest(){
+  const name=document.getElementById('sg-name').value.trim();
+  const dir=document.getElementById('sg-dir').value.trim();
+  if(!name||!dir){ alert('Por favor completá nombre y dirección.'); return; }
+  // Aquí iría el envío al backend — por ahora simulamos
+  alert('¡Gracias! Vamos a revisar ' + name + ' y lo agregamos pronto ☕');
+  document.getElementById('sg-name').value='';
+  document.getElementById('sg-dir').value='';
+  document.getElementById('sg-ig').value='';
+  document.getElementById('sg-why').value='';
+  closeModal('suggestModal');
+}
+
+// ── SHARE ─────────────────────────────────────────────────
+function getAppUrl(){ return typeof window!=='undefined'?window.location.href.split('?')[0]:'lacafetera.com.ar'; }
+function shareWhatsApp(){
+  window.open('https://wa.me/?text='+encodeURIComponent('☕ La Cafetera BsAs — la guía de cafés de especialidad de Buenos Aires: '+getAppUrl()),'_blank');
+}
+function shareTwitter(){
+  window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent('☕ La mejor guía de cafés de especialidad de Buenos Aires')+' &url='+encodeURIComponent(getAppUrl()),'_blank');
+}
+function shareNative(){
+  if(navigator.share){
+    navigator.share({title:'La Cafetera BsAs',text:'La guía de cafés de especialidad de Buenos Aires ☕',url:getAppUrl()});
+  } else { copyLink(); }
+}
+function copyLink(){
+  navigator.clipboard.writeText(getAppUrl()).then(()=>{
+    const t=document.getElementById('copiedToast');
+    t.classList.add('on');
+    setTimeout(()=>t.classList.remove('on'),2000);
+  });
+}
+
+// ── LOGIN / USUARIO ───────────────────────────────────────
+let currentUser = null;
+let _pendingFavId = null; // café a guardar después del login
+
+function loginGoogle(){
+  // Placeholder — conectar con Firebase Auth o Google OAuth
+  showToast('El login con Google estará disponible pronto ☕');
+}
+function loginEmail(){
+  const email = document.getElementById('login-email').value.trim();
+  if(!email || !email.includes('@')){ showToast('Ingresá un email válido.'); return; }
+  // Placeholder — conectar con backend
+  currentUser = {email, name: email.split('@')[0], avatar: null};
+  _storage.setItem('cafeteraSession', JSON.stringify(currentUser)); // persistir sesión
+  loadFavs();
+  updateUserUI();
+  closeModal('loginModal');
+  document.getElementById('login-email').value = '';
+  render();
+  showToast('¡Bienvenido/a, ' + currentUser.name + '! ☕');
+  // Si había una acción pendiente, ejecutarla
+  if(_pendingFavId !== null){
+    const pid = _pendingFavId; _pendingFavId = null;
+    toggleFav(pid);
+  }
+}
+function logout(){
+  currentUser = null;
+  _pendingFavId = null;
+  _storage.removeItem('cafeteraSession'); // borrar sesión persistida
+  favs = new Set();
+  document.getElementById('menuUserName').textContent = 'Entrá o creá tu cuenta';
+  document.getElementById('menuUserSub').textContent = 'Guardá tus cafés favoritos';
+  document.getElementById('menuAvatar').textContent = '👤';
+  // Ocultar logout
+  document.getElementById('logoutBtn').style.display = 'none';
+  document.getElementById('logoutDivider').style.display = 'none';
+  // Restaurar click del user-box
+  const mub = document.getElementById('menuUserBox');
+  if(mub) mub.onclick = ()=>{ closeMenu(); openModal('loginModal'); };
+  // Si estaba filtrando por favoritos, limpiar
+  if(filts.has('favs')){
+    filts.delete('favs');
+    document.querySelectorAll('.chips .chip[data-f]').forEach(c=>{ if(c.dataset.f==='favs') c.classList.remove('on'); });
+    document.getElementById('clearBtn').style.display=filts.size?'flex':'none';
+  }
+  render();
+  closeMenu();
+  showToast('Sesión cerrada 👋');
+}
+function updateUserUI(){
+  if(!currentUser) return;
+  document.getElementById('menuUserName').textContent = currentUser.name;
+  document.getElementById('menuUserSub').textContent = currentUser.email;
+  document.getElementById('menuAvatar').textContent = currentUser.name[0].toUpperCase();
+  // Mostrar botón de logout
+  document.getElementById('logoutBtn').style.display = 'flex';
+  document.getElementById('logoutDivider').style.display = 'block';
+  // Cambiar click del user-box: ya no abre el login
+  const mub = document.getElementById('menuUserBox');
+  if(mub) mub.onclick = null;
+  // Actualizar avatar topbar si existe
+  const tbAvatar = document.getElementById('tbAvatar');
+  if(tbAvatar){ tbAvatar.textContent = currentUser.name[0].toUpperCase(); tbAvatar.style.display = 'flex'; }
+  const tbLogin = document.getElementById('tbLogin');
+  if(tbLogin) tbLogin.style.display = 'none';
+}
+function showToast(msg){
+  const t=document.getElementById('copiedToast');
+  t.textContent=msg;
+  t.classList.add('on');
+  setTimeout(()=>{ t.classList.remove('on'); t.textContent='¡Link copiado!'; },2500);
+}
+
+
+// ── FAVORITOS ─────────────────────────────────────────────
+const _storage = typeof localStorage !== 'undefined' ? localStorage : { getItem:()=>null, setItem:()=>{} };
+let favs = new Set(); // vacío hasta que haya sesión activa
+
+function favsKey(){ return currentUser ? 'cafeteraFavs_' + currentUser.email : null; }
+function loadFavs(){ favs = new Set(JSON.parse(_storage.getItem(favsKey())||'[]')); }
+function saveFavs(){ if(favsKey()) _storage.setItem(favsKey(), JSON.stringify([...favs])); }
+
+function isFav(id){ return favs.has(id); }
+
+function toggleFav(id, e){
+  if(e){ e.stopPropagation(); }
+  if(!currentUser){
+    _pendingFavId = id;
+    openModal('loginModal');
+    return;
+  }
+  if(favs.has(id)){ favs.delete(id); } else { favs.add(id); }
+  saveFavs();
+  updateFavButtons(id);
+  if(filts.has('favs')) render();
+}
+
+function toggleFavPopup(id, btn){
+  if(!currentUser){
+    _pendingFavId = id;
+    openModal('loginModal');
+    return;
+  }
+  if(favs.has(id)){ favs.delete(id); } else { favs.add(id); }
+  saveFavs();
+  updateFavButtons(id);
+  if(filts.has('favs')) render();
+}
+
+function updateFavButtons(id){
+  // Card fav btns
+  document.querySelectorAll('.fav-btn[data-id="'+id+'"]').forEach(btn=>{
+    btn.classList.toggle('on', favs.has(id));
+    btn.textContent = favs.has(id) ? '❤️' : '🤍';
+  });
+  // Popup fav btn
+  document.querySelectorAll('.pu-fav-btn[data-id="'+id+'"]').forEach(btn=>{
+    btn.classList.toggle('on', favs.has(id));
+    btn.textContent = favs.has(id) ? '❤️' : '🤍';
+  });
+  // Panel fav btn
+  const pb = document.getElementById('pFavBtn');
+  if(pb && Number(pb.dataset.id)===id){
+    pb.classList.toggle('on', favs.has(id));
+    pb.innerHTML = favs.has(id) ? '❤️ Guardado' : '🤍 Guardar café';
+  }
+}
+
+function favBtnHtml(id){
+  const on = isFav(id);
+  return `<button class="fav-btn ${on?'on':''}" data-id="${id}" onclick="toggleFav(${id},event)">${on?'❤️':'🤍'}</button>`;
+}
+
+// Restaurar sesión al cargar
+(function(){
+  try {
+    const saved = _storage.getItem('cafeteraSession');
+    if(saved){ currentUser = JSON.parse(saved); loadFavs(); updateUserUI(); }
+  } catch(e){}
+})();
+
+// ── FETCH CSV Y ARRANCAR ──────────────────────────────────
+async function initApp(){
+  // Arrancar inmediatamente con datos locales
+  CAFES = _CAFES_LEGACY;
+  render();
+  locate();
+
+  // Intentar actualizar desde el sheet en segundo plano
+  try {
+    const res = await fetch(CSV_URL);
+    if(!res.ok) throw new Error('fetch failed');
+    const csv = await res.text();
+    const parsed = csvToCafes(csv);
+    if(parsed.length > 5){
+      CAFES = parsed;
+      upd(); // recalcular distancias con los nuevos datos
+      render();
+    }
+  } catch(e){
+    // Sin acceso al sheet — datos locales ya están cargados, no pasa nada
+  }
+}
+
+initApp();
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeP()});
+</script>
+
+<!-- ── SIDE MENU ── -->
+<div id="menuOverlay" onclick="closeMenu()"></div>
+<div id="sideMenu">
+  <div class="menu-header">
+    <div class="menu-logo">☕ La Cafetera</div>
+    <div class="menu-sub">Buenos Aires Specialty Coffee</div>
+    <div class="menu-user-box" id="menuUserBox" onclick="closeMenu();openModal('loginModal')">
+      <div class="menu-avatar" id="menuAvatar">👤</div>
+      <div>
+        <div class="menu-user-name" id="menuUserName">Entrá o creá tu cuenta</div>
+        <div class="menu-user-sub" id="menuUserSub">Guardá tus cafés favoritos</div>
+      </div>
+    </div>
+  </div>
+  <div class="menu-body">
+    <div class="menu-item" onclick="closeMenu();openModal('suggestModal')">
+      <div class="menu-item-ic">➕</div>
+      <div>
+        <div class="menu-item-lbl">Sugerir un café</div>
+        <div class="menu-item-sub">¿Conocés uno que falta?</div>
+      </div>
+    </div>
+    <div class="menu-item" onclick="closeMenu();openModal('shareModal')">
+      <div class="menu-item-ic">🔗</div>
+      <div>
+        <div class="menu-item-lbl">Compartir la app</div>
+        <div class="menu-item-sub">Mandásela a un amigo</div>
+      </div>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" onclick="closeMenu();openModal('aboutModal')">
+      <div class="menu-item-ic">🫶</div>
+      <div>
+        <div class="menu-item-lbl">Quiénes somos</div>
+        <div class="menu-item-sub">El proyecto detrás de La Cafetera</div>
+      </div>
+    </div>
+    <div class="menu-divider" id="logoutDivider" style="display:none"></div>
+    <div class="menu-item" id="logoutBtn" style="display:none;color:var(--red)" onclick="logout()">
+      <div class="menu-item-ic">🚪</div>
+      <div>
+        <div class="menu-item-lbl" style="color:var(--red)">Cerrar sesión</div>
+      </div>
+    </div>
+  </div>
+  <div class="menu-footer">La Cafetera BsAs · 2025 · v10</div>
+</div>
+
+<!-- ── MODAL: SUGERIR CAFÉ ── -->
+<div class="modal-overlay" id="suggestModal" onclick="closeModalOutside(event,'suggestModal')">
+  <div class="modal-box" style="position:relative">
+    <div class="modal-drag"></div>
+    <button class="modal-close" onclick="closeModal('suggestModal')">✕</button>
+    <div class="modal-title">➕ Sugerir un café</div>
+    <div class="modal-body">
+      <p style="font-size:.83rem;color:var(--ink2);margin-bottom:16px;line-height:1.5">¿Encontraste un café que falta? Contanos y lo revisamos para agregarlo.</p>
+      <div class="sform-group">
+        <label class="sform-label">Nombre del café *</label>
+        <input class="sform-input" id="sg-name" placeholder="Ej: Café San Martín">
+      </div>
+      <div class="sform-group">
+        <label class="sform-label">Dirección *</label>
+        <input class="sform-input" id="sg-dir" placeholder="Ej: San Martín 1234, Palermo">
+      </div>
+      <div class="sform-group">
+        <label class="sform-label">Instagram</label>
+        <input class="sform-input" id="sg-ig" placeholder="@nombre">
+      </div>
+      <div class="sform-group">
+        <label class="sform-label">¿Por qué lo recomendás?</label>
+        <textarea class="sform-input" id="sg-why" rows="3" placeholder="Contanos qué lo hace especial…" style="resize:none"></textarea>
+      </div>
+      <button class="sbtn" style="margin-top:4px" onclick="submitSuggest()">Enviar sugerencia ☕</button>
+      <div style="height:16px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: COMPARTIR ── -->
+<div class="modal-overlay" id="shareModal" onclick="closeModalOutside(event,'shareModal')">
+  <div class="modal-box" style="position:relative">
+    <div class="modal-drag"></div>
+    <button class="modal-close" onclick="closeModal('shareModal')">✕</button>
+    <div class="modal-title">🔗 Compartir La Cafetera</div>
+    <div class="modal-body">
+      <p style="font-size:.83rem;color:var(--ink2);margin-bottom:4px;line-height:1.5">Mandásela a alguien que ame el café tanto como vos.</p>
+      <div class="share-grid">
+        <div class="share-opt" onclick="shareWhatsApp()"><div class="share-opt-ic">💬</div><div class="share-opt-lbl">WhatsApp</div></div>
+        <div class="share-opt" onclick="shareTwitter()"><div class="share-opt-ic">🐦</div><div class="share-opt-lbl">Twitter/X</div></div>
+        <div class="share-opt" onclick="shareNative()"><div class="share-opt-ic">📤</div><div class="share-opt-lbl">Más opciones</div></div>
+      </div>
+      <div class="share-link-box">
+        <div class="share-link-url" id="shareLinkUrl">lacafetera.com.ar</div>
+        <button class="share-copy-btn" onclick="copyLink()">Copiar</button>
+      </div>
+      <div style="height:16px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: ABOUT ── -->
+<div class="modal-overlay" id="aboutModal" onclick="closeModalOutside(event,'aboutModal')">
+  <div class="modal-box" style="position:relative">
+    <div class="modal-drag"></div>
+    <button class="modal-close" onclick="closeModal('aboutModal')">✕</button>
+    <div class="about-hero">☕</div>
+    <div class="modal-title">Quiénes somos</div>
+    <div class="modal-body">
+      <div class="about-section">
+        <h3>El proyecto</h3>
+        <p>La Cafetera nació de una obsesión simple: encontrar el mejor café de especialidad en Buenos Aires sin depender del algoritmo de nadie. Una guía hecha con amor, por personas que realmente van a los cafés.</p>
+      </div>
+      <div class="about-section">
+        <h3>Qué hacemos</h3>
+        <p>Visitamos, probamos y mapeamos los cafés de especialidad de CABA. Cada lugar fue evaluado por sus propios méritos — el espacio, el café, si podés trabajar tranquilo, si podés llevar al perro.</p>
+      </div>
+      <div class="about-section">
+        <h3>El equipo</h3>
+        <div style="margin-top:4px">
+          <span class="about-pill">☕ Serena — fundadora</span>
+          <span class="about-pill">🗺 Buenos Aires</span>
+          <span class="about-pill">🐾 Pet friendly lovers</span>
+        </div>
+      </div>
+      <div class="about-section">
+        <h3>Contacto</h3>
+        <p>¿Querés sugerir un café, reportar info incorrecta o simplemente charlar sobre café?<br><br>
+        <a href="mailto:hola@lacafetera.com.ar" style="color:var(--accent);font-weight:500">hola@lacafetera.com.ar</a></p>
+      </div>
+      <div style="height:16px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: LOGIN ── -->
+<div class="modal-overlay" id="loginModal" onclick="closeModalOutside(event,'loginModal')">
+  <div class="modal-box" style="position:relative">
+    <div class="modal-drag"></div>
+    <button class="modal-close" onclick="closeModal('loginModal')">✕</button>
+    <div class="login-hero">
+      <span class="login-emoji">☕</span>
+      <div class="login-title">Tu cuenta en La Cafetera</div>
+      <div class="login-sub">Guardá tus favoritos y llevate tu lista de cafés a donde vayas.</div>
+    </div>
+    <div class="modal-body">
+      <div class="login-benefits">
+        <div class="login-benefit">❤️ Guardá cafés favoritos</div>
+        <div class="login-benefit">📍 Tu historial de visitas</div>
+        <div class="login-benefit">🔔 Recibí nuevos cafés</div>
+      </div>
+      <button class="google-btn" onclick="loginGoogle()">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.707c-.18-.54-.282-1.117-.282-1.707s.102-1.167.282-1.707V4.961H.957C.347 6.175 0 7.55 0 9s.348 2.825.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"/></svg>
+        Continuar con Google
+      </button>
+      <div class="login-divider">o</div>
+      <input class="sform-input" id="login-email" placeholder="tu@email.com" style="margin-bottom:10px">
+      <button class="email-btn" onclick="loginEmail()">Continuar con email</button>
+      <p style="font-size:.7rem;color:var(--ink3);text-align:center;margin-top:14px;line-height:1.5">Al continuar aceptás los términos de uso y la política de privacidad de La Cafetera.</p>
+      <div style="height:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="copied-toast" id="copiedToast">¡Link copiado!</div>
+
+</body>
+</html>
